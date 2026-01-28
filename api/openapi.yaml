@@ -1,0 +1,235 @@
+openapi: 3.0.0
+info:
+  title: Dead Mans Switch API
+  description: A REST API to manage dead man's switches.
+  version: 1.0.0
+servers:
+  - url: A simple REST API to manage dead man's switches that supports many notification services
+
+externalDocs:
+  url: https://github.com/circa10a/dead-mans-switch
+  description: dead-mans-switch source code
+
+paths:
+  /health:
+    get:
+      summary: Get application health for readiness/liveness checks
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /switch:
+    get:
+        summary: Get all switches
+        parameters:
+        - name: sent
+          in: query
+          required: false
+          description: Filter switches by their "sent" (triggered) status
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          required: false
+          description: Limit the number of switches returned (default is 100)
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+        responses:
+          '200':
+            description: Returns created switch
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Switch'
+          '500':
+            description: Internal server error
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+    post:
+      summary: Create dead man switch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Switch'
+      responses:
+        '201':
+          description: Returns created switch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Switch'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /switch/{id}:
+    get:
+      summary: Get the dead man switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the switch to get
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Switch successfully reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Switch'
+        '404':
+          description: Switch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete a dead man switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the switch to delete
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Switch successfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Switch'
+        '404':
+          description: Switch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /switch/{id}/reset:
+    post:
+      summary: Reset the dead man switch timer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The ID of the switch to reset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Switch successfully reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Switch'
+        '404':
+          description: Switch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          description: HTTP response code for convenience
+          type: integer
+        message:
+          description: A more detailed message about the error
+          type: string
+    Health:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [ok, failed]
+      example:
+        status: ok
+    Switch:
+      type: object
+      required:
+        - checkInInterval
+        - deleteAfterSent
+        - notifiers
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        checkInInterval:
+          type: string
+          example: "24h"
+          pattern: '^[0-9]+[smh]$'
+          x-oapi-codegen-extra-tags:
+            validate: required
+        deleteAfterSent:
+          type: boolean
+        notifiers:
+          type: array
+          items:
+            type: string
+          example:
+            - "slack://tokena/tokenb/tokenc"
+            - "discord://token@id"
+          x-oapi-codegen-extra-tags:
+            validate: required,min=1
+        sent:
+          type: boolean
+          readOnly: true
+        sendAt:
+          type: string
+          format: date-time
+          example: "2026-01-25T13:45:00Z"
+          readOnly: true

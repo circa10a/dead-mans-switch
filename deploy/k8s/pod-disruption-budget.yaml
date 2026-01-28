@@ -1,0 +1,10 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dead-mans-switch
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dead-mans-switch

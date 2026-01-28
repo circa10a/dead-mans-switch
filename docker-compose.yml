@@ -1,0 +1,7 @@
+services:
+  dead-mans-switch:
+    container_name: circa10a/dead-mans-switch
+    image: circa10a/dead-mans-switch
+    ports:
+      - 80:80
+      - 443:443

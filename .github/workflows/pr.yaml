@@ -1,0 +1,67 @@
+---
+name: test
+
+on:
+  pull_request:
+
+# Allow dependabot to update
+permissions:
+  actions: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v6
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+      - uses: dominikh/staticcheck-action@v1
+      - name: Ensure API docs are updated
+        run: make sure-docs-are-updated
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v6
+      - name: Run tests
+        run: go test -v ./...
+  container-image-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: docker build
+        run: docker build -t ${{ github.repository }} .
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.32.0
+        with:
+          image-ref: ${{ github.repository }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v6
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@v2.22.11
+        with:
+          args: ./...

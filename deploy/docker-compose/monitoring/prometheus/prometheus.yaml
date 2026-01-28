@@ -1,0 +1,7 @@
+---
+global:
+  scrape_interval: 30s
+scrape_configs:
+  - job_name: dead-mans-switch-metrics
+    static_configs:
+    - targets: ['dead-mans-switch:8080']
