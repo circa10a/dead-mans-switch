@@ -1,0 +1,20 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dead-mans-switch
+spec:
+  selector:
+    matchLabels:
+      app: dead-mans-switch
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: dead-mans-switch
+    spec:
+      containers:
+      - name: dead-mans-switch
+        image: circa10a/dead-mans-switch
+        ports:
+        - containerPort: 8080

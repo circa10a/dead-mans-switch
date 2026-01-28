@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3541/3541850.png">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3541/3541850.png">
+    
+    <title>Dead Man's Switch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background-color: #0a0a0a; }
+        .glass { background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        input[type="range"] { accent-color: #6366f1; }
+    </style>
+</head>
+<body class="text-gray-100 antialiased" x-data="app()">
+    <header class="sticky top-0 z-40 border-b border-white/5 glass">
+        <div class="max-w-3xl mx-auto px-6 h-16 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h1 class="font-medium text-lg tracking-tight">Dead Man's Switch</h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <button @click="requestNotify()" class="p-2 transition-colors rounded-full bg-white/5" :class="notifyStatus === 'granted' ? 'text-indigo-400' : 'text-gray-500'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </button>
+                <button @click="openCreateModal()" class="bg-white/10 hover:bg-white/20 border border-white/10 text-white/90 px-4 py-2 rounded-full text-xs font-medium active:scale-95 transition-all">
+                    + New
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-4 py-6 pb-32 min-h-screen">
+        <div class="space-y-4">
+            <template x-for="sw in switches" :key="sw.id">
+                <div class="glass border border-white/5 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+                    <div :class="sw.sent ? 'bg-red-500/10' : (isExpiringSoon(sw.sendAt) ? 'bg-orange-500/20 animate-pulse' : 'bg-emerald-500/5')" class="absolute inset-0 pointer-events-none transition-colors duration-1000"></div>
+                    <div class="relative z-10">
+                        <div class="flex justify-between items-start mb-4">
+                            <span :class="sw.sent ? 'text-red-400 bg-red-400/10' : (isExpiringSoon(sw.sendAt) ? 'text-orange-400 bg-orange-400/10' : 'text-emerald-400 bg-emerald-400/10')" class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border border-current/20" x-text="sw.sent ? 'Triggered' : (isExpiringSoon(sw.sendAt) ? 'Soon' : 'Active')"></span>
+                            <div class="flex gap-2">
+                                <button @click="resetSw(sw.id)" class="p-2 text-gray-400 hover:text-white bg-white/5 rounded-full transition-colors active:scale-90"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                                <button x-show="!sw.encrypted" @click="openEditModal(sw)" class="p-2 text-gray-400 hover:text-indigo-400 bg-white/5 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                                <button @click="deleteSw(sw.id)" class="p-2 text-gray-400 hover:text-red-400 bg-white/5 rounded-full"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 mb-2">
+                            <template x-if="sw.encrypted">
+                                <svg class="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                            </template>
+                            <h2 class="text-xl font-bold text-white leading-tight truncate" 
+                                x-text="sw.encrypted ? '••••••••' : sw.message"></h2>
+                        </div>
+                        
+                        <div class="flex justify-between items-end pt-4 border-t border-white/5 mt-4">
+                            <div class="flex flex-col gap-1.5 min-w-0 flex-1">
+                                <div x-show="sw.notifiers && sw.notifiers.length > 0" class="flex items-center gap-1.5">
+                                    <span class="text-[9px] font-black text-indigo-400 uppercase tracking-widest px-1.5 py-0.5 rounded border border-indigo-500/30 bg-indigo-500/5 truncate max-w-[120px]" 
+                                          x-text="sw.encrypted ? 'Secret' : (sw.notifiers[0].includes('://') ? sw.notifiers[0].split('://')[0] : sw.notifiers[0])"></span>
+                                    <span x-show="sw.notifiers.length > 1" class="text-[9px] font-black text-gray-500 shrink-0" x-text="'+' + (sw.notifiers.length - 1)"></span>
+                                </div>
+                                <div>
+                                    <span class="text-[10px] text-gray-500 uppercase font-bold block">Interval</span>
+                                    <span class="text-sm font-medium text-gray-300" x-text="sw.checkInInterval"></span>
+                                </div>
+                            </div>
+                            <div class="flex flex-col text-right shrink-0 ml-4">
+                                <span class="text-[10px] text-gray-500 uppercase font-bold">Remaining</span>
+                                <span :class="sw.sent ? 'text-red-500' : (isExpiringSoon(sw.sendAt) ? 'text-orange-400' : 'text-indigo-400')" class="text-sm font-mono font-bold tracking-tighter" x-text="sw.sent ? 'STOPPED' : getCountdown(sw.sendAt)"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <div x-show="openModal" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div x-show="openModal" x-transition.opacity @click="openModal = false" class="fixed inset-0 bg-black/90 backdrop-blur-sm"></div>
+        <div x-show="openModal" x-transition:enter="transition ease-out duration-300 transform" x-transition:enter-start="translate-y-full sm:scale-95" x-transition:enter-end="translate-y-0 sm:scale-100" class="relative w-full max-w-lg bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-white/10 shadow-2xl overflow-hidden">
+            <form @submit.prevent="saveSw" class="p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-black text-white" x-text="editingId ? 'Edit Switch' : 'New Switch'"></h3>
+                    <button type="button" @click="openModal = false" class="text-gray-500 text-sm font-bold uppercase tracking-widest">Close</button>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Message</label>
+                        <input x-model="form.message" type="text" required class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-indigo-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Interval</label>
+                            <input x-model="form.checkInInterval" type="text" pattern="^[0-9]+[smh]$" required class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-center outline-none">
+                        </div>
+                        <div class="flex items-center justify-center pt-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input x-model="form.deleteAfterSent" type="checkbox" class="w-5 h-5 rounded bg-white/5 text-indigo-500 border-white/10">
+                                <span class="text-xs text-gray-400">Auto-Delete</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase">Notifiers</label>
+                            <a href="https://shoutrrr.nickfedor.com/latest/services/overview/" target="_blank" class="text-[10px] font-black text-indigo-400 hover:text-indigo-300 uppercase flex items-center gap-1">
+                                Docs <svg class="w-2 h-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                            </a>
+                        </div>
+                        <textarea x-model="form.notifiersStr" placeholder="discord://token@channel" rows="2" class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-mono text-sm outline-none focus:border-indigo-500 transition-colors"></textarea>
+                    </div>
+                    <div class="pt-4 border-t border-white/5">
+                        <div class="flex justify-between items-center mb-2"><label class="text-[10px] font-bold text-gray-500 uppercase">Warning Threshold</label><span class="text-xs font-mono text-indigo-400 font-bold" x-text="warnThresholdMins + 'm'"></span></div>
+                        <input type="range" min="1" max="60" x-model="warnThresholdMins" @input="localStorage.setItem('warnThreshold', warnThresholdMins)" class="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer">
+                        <button type="button" @click="testNotify()" class="mt-4 w-full py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase text-gray-400 hover:text-white transition-colors">Test Notification</button>
+                    </div>
+                </div>
+                <button type="submit" class="w-full mt-8 bg-indigo-600 text-white font-black py-4 rounded-2xl active:scale-95 transition-transform" x-text="editingId ? 'SAVE CHANGES' : 'DEPLOY SWITCH'"></button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                switches: [], openModal: false, editingId: null, now: Date.now(), warnThresholdMins: 30, warnedSwitches: new Set(),
+                notifyStatus: ('Notification' in window) ? Notification.permission : 'unsupported',
+                form: { message: '', checkInInterval: '24h', notifiersStr: '', deleteAfterSent: false },
+                async init() { 
+                    await this.getSw();
+                    const saved = localStorage.getItem('warnThreshold');
+                    if (saved) this.warnThresholdMins = parseInt(saved);
+                    setInterval(() => { this.now = Date.now(); this.checkExpiring(); }, 1000);
+                    setInterval(() => this.getSw(), 10000);
+                },
+                async getSw() { try { const r = await fetch('/switch'); this.switches = await r.json(); } catch(e) {} },
+                async requestNotify() { if(this.notifyStatus === 'unsupported') return; this.notifyStatus = await Notification.requestPermission(); },
+                testNotify() { new Notification("DMS", { body: "Test Alert", icon: "https://cdn-icons-png.flaticon.com/512/3541/3541850.png" }); },
+                checkExpiring() {
+                    if (this.notifyStatus !== 'granted') return;
+                    (this.switches || []).forEach(sw => {
+                        if (sw.sent) return;
+                        if (this.isExpiringSoon(sw.sendAt) && !this.warnedSwitches.has(sw.id)) {
+                            new Notification("Switch Alert", { body: sw.encrypted ? 'Secret Switch Expiring' : sw.message });
+                            this.warnedSwitches.add(sw.id);
+                        } else if (!this.isExpiringSoon(sw.sendAt)) { this.warnedSwitches.delete(sw.id); }
+                    });
+                },
+                isExpiringSoon(deadline) { const diff = (new Date(deadline).getTime() - this.now) / 60000; return diff > 0 && diff <= this.warnThresholdMins; },
+                getCountdown(deadline) {
+                    const total = new Date(deadline).getTime() - this.now;
+                    if (isNaN(total) || total <= 0) return "00:00:00";
+                    const s = Math.floor((total / 1000) % 60), m = Math.floor((total / 60000) % 60), h = Math.floor((total / 3600000) % 24), d = Math.floor(total / 86400000);
+                    return (d > 0 ? d + 'd ' : '') + [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+                },
+                openCreateModal() { this.editingId = null; this.form = { message: '', checkInInterval: '24h', notifiersStr: '', deleteAfterSent: false }; this.openModal = true; },
+                openEditModal(sw) { 
+                    if (sw.encrypted) return; // Safeguard
+                    this.editingId = sw.id; 
+                    this.form = { 
+                        message: sw.message, 
+                        checkInInterval: sw.checkInInterval, 
+                        notifiersStr: (sw.notifiers || []).join('\n'), 
+                        deleteAfterSent: sw.deleteAfterSent 
+                    }; 
+                    this.openModal = true; 
+                },
+                async saveSw() {
+                    const payload = { ...this.form, notifiers: this.form.notifiersStr.split('\n').filter(s => s.trim()) };
+                    await fetch(this.editingId ? '/switch/' + this.editingId : '/switch', { method: this.editingId ? 'PUT' : 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } });
+                    this.openModal = false; await this.getSw();
+                },
+                async resetSw(id) { await fetch('/switch/' + id + '/reset', { method: 'POST' }); await this.getSw(); },
+                async deleteSw(id) { if(confirm('Delete?')) { await fetch('/switch/' + id, { method: 'DELETE' }); await this.getSw(); } }
+            }
+        }
+    </script>
+</body>
+</html>

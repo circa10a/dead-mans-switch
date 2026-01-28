@@ -1,0 +1,15 @@
+{
+  "name": "Dead Mans Switch",
+  "short_name": "DMS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3541/3541850.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
