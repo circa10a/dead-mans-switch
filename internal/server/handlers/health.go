@@ -8,7 +8,7 @@ import (
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
 )
 
-// Handles health check requests.
+// Health handles health check requests.
 type Health struct {
 	Store database.Store
 }

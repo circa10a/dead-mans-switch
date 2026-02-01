@@ -166,24 +166,6 @@ func TestServerConfigOpts(t *testing.T) {
 		}
 	})
 
-	t.Run("EncryptionEnabled", func(t *testing.T) {
-		v := true
-		cfg := &Config{
-			EncryptionEnabled: v,
-			StorageDir:        tmpDir,
-			Validation:        false,
-		}
-
-		s, err := New(cfg)
-		if err != nil {
-			t.Errorf("received unexpected err: %s", err.Error())
-		}
-
-		if s.EncryptionEnabled != v {
-			t.Errorf(outputStr, s.EncryptionEnabled, v)
-		}
-	})
-
 	t.Run("AddMiddlewares", func(t *testing.T) {
 		v := []func(http.Handler) http.Handler{
 			func(h http.Handler) http.Handler { return nil },

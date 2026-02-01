@@ -77,3 +77,54 @@ func TestLoadOrCreateKey(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadOrCreateVAPIDKeys(t *testing.T) {
+	tmpDir := t.TempDir()
+	privPath := filepath.Join(tmpDir, "vapid.priv")
+	pubPath := filepath.Join(tmpDir, "vapid.pub")
+
+	t.Run("generates new VAPID keys if they do not exist", func(t *testing.T) {
+		priv, pub, err := LoadOrCreateVAPIDKeys(privPath, pubPath)
+		if err != nil {
+			t.Fatalf("Failed to generate VAPID keys: %v", err)
+		}
+
+		if priv == "" || pub == "" {
+			t.Error("expected non-empty strings for VAPID keys")
+		}
+
+		// Check if files exist
+		if _, err := os.Stat(privPath); os.IsNotExist(err) {
+			t.Error("private key file was not created")
+		}
+		if _, err := os.Stat(pubPath); os.IsNotExist(err) {
+			t.Error("public key file was not created")
+		}
+	})
+
+	t.Run("loads existing VAPID keys from disk", func(t *testing.T) {
+		// Read keys generated in previous step
+		origPriv, _ := os.ReadFile(privPath)
+		origPub, _ := os.ReadFile(pubPath)
+
+		priv, pub, err := LoadOrCreateVAPIDKeys(privPath, pubPath)
+		if err != nil {
+			t.Fatalf("Failed to load existing VAPID keys: %v", err)
+		}
+
+		if priv != string(origPriv) || pub != string(origPub) {
+			t.Error("loaded keys do not match the keys stored on disk")
+		}
+	})
+
+	t.Run("enforces restrictive permissions on private key", func(t *testing.T) {
+		info, err := os.Stat(privPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if info.Mode().Perm() != 0600 {
+			t.Errorf("expected 0600 permissions on private key, got %v", info.Mode().Perm())
+		}
+	})
+}

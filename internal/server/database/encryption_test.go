@@ -50,8 +50,15 @@ func TestEncryptionRoundTrip(t *testing.T) {
 
 	t.Run("randomized output for same input", func(t *testing.T) {
 		// Encrypt the same thing twice
-		c1, _ := store.encrypt(plaintext)
-		c2, _ := store.encrypt(plaintext)
+		c1, err := store.encrypt(plaintext)
+		if err != nil {
+			t.Fatalf("failed to encrypt: %v", err)
+		}
+
+		c2, err := store.encrypt(plaintext)
+		if err != nil {
+			t.Fatalf("failed to encrypt: %v", err)
+		}
 
 		if c1 == c2 {
 			t.Error("ciphertexts should be unique due to random nonce")
@@ -66,11 +73,14 @@ func TestEncryptionRoundTrip(t *testing.T) {
 	})
 
 	t.Run("fails with tampered ciphertext", func(t *testing.T) {
-		ciphertext, _ := store.encrypt(plaintext)
+		ciphertext, err := store.encrypt(plaintext)
+		if err != nil {
+			t.Fatalf("failed to encrypt: %v", err)
+		}
 		// Alter one character in the middle of the base64 string
 		tampered := ciphertext[:10] + "A" + ciphertext[11:]
 
-		_, err := store.decrypt(tampered)
+		_, err = store.decrypt(tampered)
 		if err == nil {
 			t.Error("expected error for tampered ciphertext (GCM authentication should fail)")
 		}

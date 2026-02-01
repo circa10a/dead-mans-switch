@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-dead-man-switch-api
+dead-mans-switch
 
 # OS
 .DS_Store
@@ -17,6 +17,7 @@ dead-man-switch-api
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+results.html
 
 # Dependency directories (remove the comment below to include it)
 # vendor/

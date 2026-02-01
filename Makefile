@@ -69,6 +69,9 @@ sure-docs-are-updated:
 
 test:
 	@go test -v -coverprofile=coverage.out ./...
+	@# Filter out generated files from the profile
+	@grep -v -E "api/gen.go" coverage.out > coverage.cleaned.out
+	@mv coverage.cleaned.out coverage.out
 	@go tool cover -func=coverage.out
 
 coverage: test

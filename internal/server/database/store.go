@@ -10,12 +10,14 @@ type Store interface {
 	Create(sw api.Switch) (api.Switch, error)
 	// GetAll retrieves a list of switches up to the specified limit.
 	GetAll(limit int) ([]api.Switch, error)
-	// GetAllBySent retrieves switches filtered by their sent status.
-	GetAllBySent(sent bool, limit int) ([]api.Switch, error)
 	// GetByID retrieves a single switch by its unique identifier.
 	GetByID(id int) (api.Switch, error)
 	// GetExpired retrieves switches whose send_at time has passed but haven't been sent.
 	GetExpired(limit int) ([]api.Switch, error)
+	// GetEligibleReminders retrieves switches that are approaching expiry but haven't had a PWA reminder sent yet.
+	GetEligibleReminders(limit int) ([]api.Switch, error)
+	// ReminderSent flags a switch so the PWA reminder isn't sent repeatedly in the same cycle.
+	ReminderSent(id int) error
 	// Sent marks a specific switch as having been processed/sent.
 	Sent(id int) error
 	// Update modifies an existing switch's message, notifiers, and interval.
@@ -24,6 +26,8 @@ type Store interface {
 	Delete(id int) error
 	// Reset updates the send_at time for a switch based on its check-in interval.
 	Reset(id int) error
+	// Disable disables a switch to it will not be monitored.
+	Disable(id int) error
 	// Ping verifies the database connection is alive.
 	Ping() error
 	// Close terminates the database connection.

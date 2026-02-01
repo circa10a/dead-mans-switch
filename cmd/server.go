@@ -1,8 +1,14 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/circa10a/dead-mans-switch/internal/server"
@@ -11,37 +17,61 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Constants for Viper keys and Flag names
+const (
+	autoTLSKey         = "auto-tls"
+	contactEmailKey    = "contact-email"
+	domainsKey         = "domains"
+	logFormatKey       = "log-format"
+	logLevelKey        = "log-level"
+	metricsKey         = "metrics"
+	portKey            = "port"
+	storageDirKey      = "storage-dir"
+	tlsCertificateKey  = "tls-certificate"
+	tlsKeyKey          = "tls-key"
+	workerBatchSizeKey = "worker-batch-size"
+	workerIntervalKey  = "worker-interval"
+)
+
 // serverCmd represents the server command
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: fmt.Sprintf("Start the %s server", project),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Build server configuration from environment (via viper) or flags
+		// Build server configuration using the constants
 		cfg := &server.Config{
-			AutoTLS:           viper.GetBool("auto-tls"),
-			Domains:           viper.GetStringSlice("domains"),
-			EncryptionEnabled: viper.GetBool("encryption-enabled"),
-			LogFormat:         viper.GetString("log-format"),
-			LogLevel:          viper.GetString("log-level"),
-			Metrics:           viper.GetBool("metrics"),
-			Port:              viper.GetInt("port"),
-			StorageDir:        viper.GetString("storage-dir"),
-			TLSCert:           viper.GetString("tls-certificate"),
-			TLSKey:            viper.GetString("tls-key"),
-			Validation:        true,
-			WorkerBatchSize:   viper.GetInt("worker-batch-size"),
-			WorkerInterval:    viper.GetDuration("worker-interval"),
+			AutoTLS:         viper.GetBool(autoTLSKey),
+			ContactEmail:    viper.GetString(contactEmailKey),
+			Domains:         viper.GetStringSlice(domainsKey),
+			LogFormat:       viper.GetString(logFormatKey),
+			LogLevel:        viper.GetString(logLevelKey),
+			Metrics:         viper.GetBool(metricsKey),
+			Port:            viper.GetInt(portKey),
+			StorageDir:      viper.GetString(storageDirKey),
+			TLSCert:         viper.GetString(tlsCertificateKey),
+			TLSKey:          viper.GetString(tlsKeyKey),
+			Validation:      true,
+			WorkerBatchSize: viper.GetInt(workerBatchSizeKey),
+			WorkerInterval:  viper.GetDuration(workerIntervalKey),
 		}
 
-		s, err := server.New(cfg)
+		server, err := server.New(cfg)
 		if err != nil {
 			return err
 		}
 
-		err = s.Start()
-		if err != nil {
-			return err
-		}
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+		go func() {
+			err := server.Start()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("server error: %v", err)
+			}
+		}()
+
+		<-stop
+		server.Stop()
 
 		return nil
 	},
@@ -51,24 +81,22 @@ func init() {
 	rootCmd.AddCommand(serverCmd)
 
 	serverFlags := []flagDef{
-		{Name: "auto-tls", Shorthand: "a", Type: "bool", Default: false, Usage: "Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation.", ViperKey: "auto-tls"},
-		{Name: "domains", Shorthand: "d", Type: "stringArray", Default: []string{}, Usage: "Domains to issue certificate for. Must be used with --auto-tls.", ViperKey: "domains"},
-		{Name: "encryption-enabled", Shorthand: "e", Type: "bool", Default: false, Usage: "Encryption enabled ensures notifiers aren't stored/return in plaintext. Will create a key in the storage directory.", ViperKey: "encryption-enabled"},
-		{Name: "log-format", Shorthand: "f", Type: "string", Default: "text", Usage: "Server logging format. Supported values are 'text' and 'json'.", ViperKey: "log-format"},
-		{Name: "log-level", Shorthand: "l", Type: "string", Default: "info", Usage: "Server logging level.", ViperKey: "log-level"},
-		{Name: "metrics", Shorthand: "m", Type: "bool", Default: false, Usage: "Enable Prometheus metrics intrumentation.", ViperKey: "metrics"},
-		{Name: "port", Shorthand: "p", Type: "int", Default: 8080, Usage: "Port to listen on. Cannot be used in conjunction with --auto-tls since that will require listening on 80 and 443.", ViperKey: "port"},
-		{Name: "storage-dir", Shorthand: "s", Type: "string", Default: "./data", Usage: "Storage directory for database", ViperKey: "storage-dir"},
-		{Name: "tls-certificate", Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS certificate. Cannot be used with --auto-tls.", ViperKey: "tls-certificate"},
-		{Name: "tls-key", Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS key. Cannot be used with --auto-tls.", ViperKey: "tls-key"},
-		{Name: "worker-batch-size", Shorthand: "", Type: "int", Default: 1000, Usage: "How many notification records to process at a time.", ViperKey: "worker-batch-size"},
-		{Name: "worker-interval", Shorthand: "", Type: "duration", Default: 5 * time.Minute, Usage: "How often to check for expired switches.", ViperKey: "worker-interval"},
+		{Name: autoTLSKey, Shorthand: "a", Type: "bool", Default: false, Usage: "Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation.", ViperKey: autoTLSKey},
+		{Name: contactEmailKey, Shorthand: "", Type: "string", Default: "user@dead-mans-switch.com", Usage: "Email used for TLS cert registration + push notification point of contact (not required).", ViperKey: contactEmailKey},
+		{Name: domainsKey, Shorthand: "d", Type: "stringArray", Default: []string{}, Usage: "Domains to issue certificate for. Must be used with --auto-tls.", ViperKey: domainsKey},
+		{Name: logFormatKey, Shorthand: "f", Type: "string", Default: "text", Usage: "Server logging format. Supported values are 'text' and 'json'.", ViperKey: logFormatKey},
+		{Name: logLevelKey, Shorthand: "l", Type: "string", Default: "info", Usage: "Server logging level.", ViperKey: logLevelKey},
+		{Name: metricsKey, Shorthand: "m", Type: "bool", Default: false, Usage: "Enable Prometheus metrics instrumentation.", ViperKey: metricsKey},
+		{Name: portKey, Shorthand: "p", Type: "int", Default: 8080, Usage: "Port to listen on. Cannot be used in conjunction with --auto-tls since that will require listening on 80 and 443.", ViperKey: portKey},
+		{Name: storageDirKey, Shorthand: "s", Type: "string", Default: "./data", Usage: "Storage directory for database", ViperKey: storageDirKey},
+		{Name: tlsCertificateKey, Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS certificate. Cannot be used with --auto-tls.", ViperKey: tlsCertificateKey},
+		{Name: tlsKeyKey, Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS key. Cannot be used with --auto-tls.", ViperKey: tlsKeyKey},
+		{Name: workerBatchSizeKey, Shorthand: "", Type: "int", Default: 1000, Usage: "How many notification records to process at a time.", ViperKey: workerBatchSizeKey},
+		{Name: workerIntervalKey, Shorthand: "", Type: "duration", Default: 5 * time.Minute, Usage: "How often to check for expired switches.", ViperKey: workerIntervalKey},
 	}
 
-	// Register flags using the centralized helper from root.go
 	RegisterFlagTypes(serverCmd, serverFlags)
 
-	// Viper: bind environment variables and enable env support for flags.
 	viper.SetEnvPrefix(strings.ToUpper(envVarPrefix))
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
@@ -77,7 +105,6 @@ func init() {
 		_ = viper.BindPFlag(d.ViperKey, serverCmd.Flags().Lookup(d.Name))
 	}
 
-	// Append environment variable hints to flag usage text so users see how to set via environment variable
 	serverCmd.Flags().VisitAll(func(f *pflag.Flag) {
 		env := strings.ToUpper(envVarPrefix) + "_" + strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_"))
 		if !strings.Contains(f.Usage, "env:") {

@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Dead Man">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/15151/15151343.png">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/15151/15151343.png">
+
+    <title>Dead Man's Switch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] {
+            display: none !important;
+        }
+
+        body {
+            background-color: #0a0a0a;
+        }
+
+        .glass {
+            background: rgba(23, 23, 23, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .disabled-card-container {
+            background: rgba(255, 255, 255, 0.02) !important;
+            border-color: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            background: rgba(255, 255, 255, 0.1);
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            margin-top: -5px;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #6366f1;
+            border-radius: 50%;
+            border: 2px solid white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body class="text-gray-100 antialiased" x-data="app()">
+    <template x-if="!isSecure && showInsecureWarning">
+        <div
+            class="bg-amber-500 text-black px-4 py-2 text-[10px] font-bold uppercase tracking-widest flex justify-between items-center z-[60] relative">
+            <span>Push Notifications require HTTPS / Secure Context</span>
+            <button @click="showInsecureWarning = false" class="bg-black/10 px-2 py-1 rounded">Dismiss</button>
+        </div>
+    </template>
+
+    <div x-show="!isOnline" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="-translate-y-full" x-transition:enter-end="translate-y-0"
+        x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0"
+        x-transition:leave-end="-translate-y-full"
+        class="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-3 text-center shadow-lg border-b border-red-500">
+        <div class="flex items-center justify-center gap-2">
+            <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+            </span>
+            Connection Lost — Attempting to Reconnect
+        </div>
+    </div>
+
+    <header class="sticky top-0 z-40 border-b border-white/5 glass">
+        <div class="max-w-3xl mx-auto px-6 h-16 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12h-4l-3 9L9 3l-3 9H2" />
+                    </svg>
+                </div>
+                <h1 class="font-medium text-lg tracking-tight">Dead Man's Switch</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <button @click="forcePermission()" class="p-2 rounded-full transition-all active:scale-95" :class="{
+                        'text-indigo-400 bg-indigo-500/10 animate-pulse cursor-pointer': notifyStatus === 'default',
+                        'text-indigo-400 bg-indigo-500/10': notifyStatus === 'granted',
+                        'text-gray-600 bg-white/5': notifyStatus === 'denied'
+                    }" :title="notifyStatus === 'granted' ? 'Notifications Enabled' : 'Click to Enable Notifications'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+                <button @click="openCreateModal()"
+                    class="bg-white/10 hover:bg-white/20 border border-white/10 text-white/90 px-4 py-2 rounded-full text-xs font-medium transition-all">+
+                    New</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto px-4 py-6 pb-32 min-h-screen">
+        <div class="space-y-4">
+            <template x-for="sw in switches" :key="sw.id">
+                <div class="glass border border-white/5 rounded-2xl p-5 shadow-2xl relative overflow-hidden group transition-all duration-500"
+                    :class="sw.disabled ? 'disabled-card-container' : ''">
+
+                    <div :class="sw.disabled ? '' : (sw.sent ? 'bg-red-500/10' : (isPending(sw) ? 'bg-amber-500/20 animate-pulse' : (isExpiringSoon(sw.sendAt) ? 'bg-orange-500/20 animate-pulse' : 'bg-emerald-500/5')))"
+                        class="absolute inset-0 pointer-events-none transition-colors duration-1000"></div>
+
+                    <div class="relative z-10">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2">
+                                <span
+                                    :class="sw.disabled ? 'text-gray-500 bg-gray-500/10 border-gray-500/20' : 
+                                    (sw.sent || isStuck(sw) ? 'text-red-400 bg-red-400/10 border-red-400/20' : 
+                                    (isPending(sw) ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' : 
+                                    (isExpiringSoon(sw.sendAt) ? 'text-orange-400 bg-orange-400/10 border-orange-400/20' : 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20')))"
+                                    class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border"
+                                    :class="isStuck(sw) ? 'animate-pulse ring-1 ring-red-500/50' : ''"
+                                    x-text="sw.disabled ? 'Paused' : (sw.sent ? 'Triggered' : (isStuck(sw) ? 'Stuck' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.sendAt) ? 'Soon' : 'Active'))))">
+                                </span>
+
+                                <template x-if="isPushEnabled(sw)">
+                                    <div class="flex items-center justify-center text-indigo-400 animate-pulse"
+                                        title="Push Notifications Enabled">
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path
+                                                d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
+                                        </svg>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="flex gap-2">
+                                <button x-show="!sw.disabled" @click="disableSw(sw.id)"
+                                    class="p-2 text-gray-400 hover:text-amber-400 transition-colors"
+                                    title="Pause Switch">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </button>
+                                <button x-show="!sw.encrypted" @click="openEditModal(sw)"
+                                    class="p-2 text-gray-400 hover:text-indigo-400 transition-colors"><svg
+                                        class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                            stroke-width="2" stroke-linecap="round"></path>
+                                    </svg></button>
+                                <button @click="deleteSw(sw.id)"
+                                    class="p-2 text-gray-400 hover:text-red-400 transition-colors"><svg class="w-5 h-5"
+                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                            stroke-width="2" stroke-linecap="round"></path>
+                                    </svg></button>
+                            </div>
+                        </div>
+
+                        <div :class="sw.disabled ? 'opacity-40 grayscale' : ''">
+                            <h2 class="text-xl font-bold text-white mb-1 truncate"
+                                x-text="sw.encrypted ? '••••••••' : sw.message"></h2>
+
+                            <div class="flex flex-wrap gap-1.5 mb-4">
+                                <template x-for="uri in (sw.notifiers || [])" :key="uri">
+                                    <span
+                                        class="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded text-[9px] font-bold uppercase tracking-wider"
+                                        x-text="uri.includes('://') ? uri.split('://')[0] : 'Secret'">
+                                    </span>
+                                </template>
+                            </div>
+
+                            <div class="flex justify-between items-end">
+                                <div><span
+                                        class="text-[10px] text-gray-500 uppercase font-bold block">Interval</span><span
+                                        class="text-sm font-medium text-gray-300" x-text="sw.checkInInterval"></span>
+                                </div>
+                                <div class="text-right"><span
+                                        class="text-[10px] text-gray-500 uppercase font-bold">Remaining</span><span
+                                        :class="sw.disabled ? 'text-gray-500' : (sw.sent ? 'text-red-500' : (isPending(sw) ? 'text-amber-400' : (isExpiringSoon(sw.sendAt) ? 'text-orange-400' : 'text-indigo-400')))"
+                                        class="text-sm font-mono font-bold block"
+                                        x-text="sw.disabled ? 'PAUSED' : (sw.sent ? 'STOPPED' : getCountdown(sw.sendAt))"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-white/5 mt-4">
+                            <button @click="resetSw(sw.id)" :disabled="resettingId === sw.id"
+                                :class="resettingId === sw.id ? 'bg-emerald-500 text-black border-emerald-500 scale-[0.97]' : (sw.disabled ? 'bg-white/10 text-white border-white/10 hover:bg-white/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20')"
+                                class="w-full py-4 border text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden relative active:scale-95">
+                                <span x-show="resettingId !== sw.id"
+                                    x-text="sw.disabled ? 'Enable' : 'Check In'"></span>
+                                <span x-show="resettingId === sw.id" class="flex items-center gap-2"><svg
+                                        class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path d="M5 13l4 4L19 7" stroke-width="3" stroke-linecap="round"></path>
+                                    </svg> <span x-text="sw.disabled ? 'Enabled' : 'Checked In'"></span></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </main>
+
+    <div x-show="openModal" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div x-show="openModal" x-transition.opacity @click="openModal = false"
+            class="fixed inset-0 bg-black/90 backdrop-blur-sm"></div>
+        <div x-show="openModal" x-transition:enter="transition ease-out duration-300 transform"
+            x-transition:enter-start="translate-y-full sm:scale-95"
+            class="relative w-full max-w-lg bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <form @submit.prevent="saveSw">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-black text-white" x-text="editingId ? 'Edit Switch' : 'New Switch'"></h3>
+                    <button type="button" @click="openModal = false"
+                        class="text-gray-500 text-xs font-bold uppercase">Close</button>
+                </div>
+
+                <template x-if="isPushEnabled(sw)">
+                    <div
+                        class="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]">
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Push
+                                    Notifications On</p>
+                                <p class="text-[9px] text-emerald-400/60 uppercase font-medium">Ready for reminders</p>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Message</label>
+                        <input x-model="form.message" type="text" required
+                            class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Check-In Interval (e.g.
+                            24h)</label>
+                        <input x-model="form.checkInInterval" type="text" required
+                            class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-indigo-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase block">Notifiers (one per
+                                line)</label>
+                            <a href="https://shoutrrr.nickfedor.com/latest/services/overview/" target="_blank"
+                                class="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase underline decoration-indigo-500/30 underline-offset-2">Docs
+                                &rarr;</a>
+                        </div>
+                        <textarea x-model="form.notifiersStr"
+                            class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-24 text-sm font-mono"
+                            placeholder="ntfy.sh/topic"></textarea>
+                    </div>
+
+                    <div x-show="isSecure" class="pt-4 border-t border-white/5 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <label class="text-[10px] font-bold text-gray-500 uppercase block">Push Reminder
+                                Threshold</label>
+                            <span class="text-xs font-black text-indigo-400"
+                                x-text="reminderSteps[form.reminderIndex].label === 'Off' ? 'Disabled' : reminderSteps[form.reminderIndex].label + ' before'"></span>
+                        </div>
+                        <div class="px-1 py-4">
+                            <input type="range" min="0" :max="reminderSteps.length - 1" step="1"
+                                x-model="form.reminderIndex" @input="updateReminderFromSlider()"
+                                class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                            <div class="flex justify-between mt-4">
+                                <template x-for="(step, index) in reminderSteps" :key="index">
+                                    <span class="text-[7px] font-bold uppercase"
+                                        :class="form.reminderIndex == index ? 'text-indigo-400' : 'text-gray-600'"
+                                        x-text="step.label"></span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.deleteAfterSent"
+                                type="checkbox" class="rounded bg-white/5 text-indigo-500"><span
+                                class="text-[10px] text-gray-400">Auto-Delete</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.encrypted"
+                                type="checkbox" class="rounded bg-white/5 text-indigo-500"><span
+                                class="text-[10px] text-gray-400">Encrypted</span></label>
+                    </div>
+                </div>
+                <button type="submit"
+                    class="w-full mt-8 bg-indigo-600 text-white font-black py-4 rounded-2xl transition-transform active:scale-95">SAVE</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                baseUrl: '/api/v1', switches: [], openModal: false, editingId: null, now: Date.now(), resettingId: null,
+                isOnline: navigator.onLine,
+                isSecure: window.isSecureContext || window.location.protocol === 'https:',
+                showInsecureWarning: true,
+                notifyStatus: ('Notification' in window) ? Notification.permission : 'unsupported',
+                vapidPublicKey: '',
+                reminderSteps: [
+                    { label: 'Off', value: '' },
+                    { label: '5m', value: '5m' },
+                    { label: '30m', value: '30m' },
+                    { label: '1h', value: '1h' },
+                    { label: '8h', value: '8h' },
+                    { label: '24h', value: '24h' }
+                ],
+                form: {
+                    message: '',
+                    checkInInterval: '24h',
+                    notifiersStr: '',
+                    deleteAfterSent: false,
+                    encrypted: false,
+                    reminderThreshold: '',
+                    reminderIndex: 0,
+                    pushSubscription: null
+                },
+
+                updateReminderFromSlider() {
+                    this.form.reminderThreshold = this.reminderSteps[this.form.reminderIndex].value;
+                },
+
+                async init() {
+                    // Setup Connection Listeners
+                    window.addEventListener('online', () => { this.isOnline = true; this.getSw(); });
+                    window.addEventListener('offline', () => { this.isOnline = false; });
+
+                    // Fetch VAPID Key from server
+                    try {
+                        const res = await fetch(`${this.baseUrl}/vapid`);
+                        if (res.ok) {
+                            this.vapidPublicKey = (await res.text()).trim();
+                            this.isOnline = true;
+                        }
+                    } catch (e) {
+                        console.error("Could not fetch VAPID key", e);
+                        // Note: We don't set isOnline false here yet,
+                        // as the server might be up but just missing the VAPID endpoint.
+                    }
+
+                    // Immediate Permission Request & SW Registration
+                    if ('Notification' in window) {
+                        // Update current status (granted, denied, or default)
+                        this.notifyStatus = Notification.permission;
+
+                        // If we haven't asked yet, ask now
+                        if (Notification.permission === 'default') {
+                            this.notifyStatus = await Notification.requestPermission();
+                        }
+
+                        // If permission is granted, register Service Worker
+                        if (this.notifyStatus === 'granted' && 'serviceWorker' in navigator) {
+                            try {
+                                await navigator.serviceWorker.register('/sw.js');
+                                console.log("Service Worker registered");
+                            } catch (e) {
+                                console.error("Service Worker registration failed", e);
+                            }
+                        }
+                    }
+
+                    // Background Sync for UI
+                    // Keep the bell icon status updated if permissions change in browser settings
+                    setInterval(() => {
+                        if ('Notification' in window) {
+                            this.notifyStatus = Notification.permission;
+                        }
+                    }, 2000);
+
+                    // Update the "now" timestamp for the countdown timers every second
+                    setInterval(() => {
+                        this.now = Date.now();
+                    }, 1000);
+
+                    // Refresh the list of switches every 10 seconds (unless modal is open/busy)
+                    // This fetch also acts as a heartbeat for the 'isOnline' status
+                    setInterval(() => {
+                        if (!this.openModal && !this.resettingId) this.getSw();
+                    }, 10000);
+
+                    // Initial data load
+                    await this.getSw();
+                },
+
+                async requestNotify() {
+                    if (!('Notification' in window)) return;
+                    this.notifyStatus = await Notification.requestPermission();
+                },
+
+                isPushEnabled(sw) {
+                    return sw.pushSubscription && sw.reminderThreshold && !sw.disabled;
+                },
+
+                isStuck(sw) {
+                    if (sw.sent || sw.disabled) return false;
+                    const oneHourInMs = 60 * 60 * 1000;
+                    return (this.now - new Date(sw.sendAt).getTime()) > oneHourInMs;
+                },
+
+                isExpiringSoon(deadline) {
+                    const diff = (new Date(deadline).getTime() - this.now) / 60000; return diff > 0 && diff <= 30;
+                },
+
+                isPending(sw) {
+                    return !sw.sent && !sw.disabled && (new Date(sw.sendAt).getTime() - this.now) <= 0;
+                },
+
+                getCountdown(deadline) {
+                    const total = new Date(deadline).getTime() - this.now;
+                    if (isNaN(total) || total <= 0) return "00:00:00";
+                    const s = Math.floor((total / 1000) % 60), m = Math.floor((total / 60000) % 60), h = Math.floor((total / 3600000) % 24), d = Math.floor(total / 86400000);
+                    return (d > 0 ? d + 'd ' : '') + [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+                },
+
+                async forcePermission() {
+                    if (!('Notification' in window)) {
+                        alert("Notifications are not supported on this browser.");
+                        return;
+                    }
+
+                    if (Notification.permission === 'denied') {
+                        alert("Notifications are blocked. Please enable them in your System Settings > Notifications.");
+                        return;
+                    }
+
+                    const result = await Notification.requestPermission();
+                    this.notifyStatus = result;
+
+                    if (result === 'granted' && 'serviceWorker' in navigator) {
+                        await navigator.serviceWorker.register('/sw.js');
+                    }
+                },
+
+                openCreateModal() {
+                    this.editingId = null;
+                    this.form = { message: '', checkInInterval: '24h', notifiersStr: '', deleteAfterSent: false, encrypted: false, reminderThreshold: '', reminderIndex: 0, pushSubscription: null };
+                    this.openModal = true;
+                },
+
+                openEditModal(sw) {
+                    this.editingId = sw.id;
+                    const rIndex = this.reminderSteps.findIndex(s => s.value === (sw.reminderThreshold || ''));
+                    this.form = {
+                        ...sw,
+                        notifiersStr: (sw.notifiers || []).join('\n'),
+                        reminderIndex: rIndex !== -1 ? rIndex : 0,
+                        pushSubscription: sw.pushSubscription
+                    };
+                    this.openModal = true;
+                },
+
+
+                async deleteSw(id) {
+                    if (confirm('Delete?')) {
+                        await fetch(`${this.baseUrl}/switch/${id}`, { method: 'DELETE' });
+                        await this.getSw();
+                    }
+                },
+
+                async disableSw(id) {
+                    try {
+                        await fetch(`${this.baseUrl}/switch/${id}/disable`, { method: 'POST' });
+                        await this.getSw();
+                    } catch (e) { console.error("Disable failed", e); }
+                },
+
+                async getSw() {
+                    try {
+                        const r = await fetch(`${this.baseUrl}/switch`);
+                        if (!r.ok) throw new Error("Server error");
+                        this.switches = await r.json();
+                        this.isOnline = true; // Connection is healthy
+                    } catch (e) {
+                        this.isOnline = false; // Connection failed
+                        console.error("Fetch failed:", e);
+                    }
+                },
+
+                async resetSw(id) {
+                    this.resettingId = id;
+                    if ("vibrate" in navigator) navigator.vibrate([40, 40, 40]);
+
+                    const currentSub = await this.getSubscription();
+
+                    await fetch(`${this.baseUrl}/switch/${id}/reset`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ pushSubscription: currentSub })
+                    });
+
+                    await this.getSw();
+                    setTimeout(() => { this.resettingId = null; }, 1000);
+                },
+
+                async saveSw() {
+                    const notifiers = this.form.notifiersStr.split('\n').filter(s => s.trim());
+
+                    const currentSub = await this.getSubscription();
+
+                    const payload = {
+                        ...this.form,
+                        notifiers: notifiers,
+                        pushSubscription: currentSub
+                    };
+
+                    // if we didn't get a fresh sub and the form has the redacted one,
+                    // remove it from the payload so we don't overwrite the DB with empty data.
+                    if (!currentSub && payload.pushSubscription && Object.keys(payload.pushSubscription).length === 0) {
+                        delete payload.pushSubscription;
+                    };
+
+                    const url = this.editingId ? `${this.baseUrl}/switch/${this.editingId}` : `${this.baseUrl}/switch`;
+
+                    try {
+                        const res = await fetch(url, {
+                            method: this.editingId ? 'PUT' : 'POST',
+                            body: JSON.stringify(payload),
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+
+                        if (res.ok) {
+                            this.openModal = false;
+                            await this.getSw();
+                        } else {
+                            const errData = await res.json();
+                            alert(`Error: ${errData.message}`);
+                        }
+                    } catch (e) {
+                        console.error("Save failed", e);
+                    }
+                },
+
+                async getSubscription() {
+                    if (this.isSecure && 'serviceWorker' in navigator && Notification.permission === 'granted') {
+                        try {
+                            const reg = await navigator.serviceWorker.ready;
+                            let sub = await reg.pushManager.getSubscription();
+                            if (!sub && this.vapidPublicKey) {
+                                sub = await reg.pushManager.subscribe({
+                                    userVisibleOnly: true,
+                                    applicationServerKey: Uint8Array.from(atob(this.vapidPublicKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+                                });
+                            }
+                            return sub;
+                        } catch (e) {
+                            console.error("Failed to get subscription:", e);
+                        }
+                    }
+                    return null;
+                }
+            }
+        }
+    </script>
+    <div x-show="notifyStatus === 'default'" x-transition:enter="transition ease-out duration-500"
+        x-transition:enter-start="translate-y-20 opacity-0" x-transition:enter-end="translate-y-0 opacity-100"
+        class="fixed bottom-6 left-4 right-4 z-[60] max-w-md mx-auto">
+        <div
+            class="bg-indigo-600 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 border border-indigo-400/30">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-lg">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-black uppercase tracking-wider text-white">Enable Reminders</p>
+                    <p class="text-[10px] text-indigo-100 opacity-80">Don't miss your check-in window.</p>
+                </div>
+            </div>
+            <button @click="forcePermission()"
+                class="bg-white text-indigo-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-transform">
+                Allow
+            </button>
+        </div>
+    </div>
+</body>
+
+</html>

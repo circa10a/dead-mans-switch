@@ -4,7 +4,7 @@ info:
   description: A REST API to manage dead man's switches.
   version: 1.0.0
 servers:
-  - url: http://localhost:8080
+  - url: http://localhost:8080/api/v1
     description: Local development server
 
 externalDocs:
@@ -28,16 +28,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Health'
+  /vapid:
+    get:
+      summary: Get the VAPID public key for PWA push notifications
+      description: Returns the raw public key string required for the browser pushManager handshake.
+      responses:
+        '200':
+          description: The VAPID public key
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "someSecretKey"
   /switch:
     get:
       summary: Get all switches
       parameters:
-        - name: sent
-          in: query
-          required: false
-          description: Filter switches by their "sent" (triggered) status
-          schema:
-            type: boolean
         - name: limit
           in: query
           required: false
@@ -186,6 +192,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /switch/{id}/disable:
+    post:
+      summary: Disable the dead man switch
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Switch successfully disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Switch'
+        '404':
+          description: Switch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   schemas:
@@ -212,6 +240,7 @@ components:
       required:
         - checkInInterval
         - deleteAfterSent
+        - disabled
         - encrypted
         - message
         - notifiers
@@ -225,11 +254,12 @@ components:
           pattern: '^[0-9]+[smh]$'
           x-oapi-codegen-extra-tags:
             validate: required
+        disabled:
+          type: boolean
         deleteAfterSent:
           type: boolean
         encrypted:
           type: boolean
-          readOnly: true
         message:
           type: string
           example: Alert!
@@ -245,6 +275,17 @@ components:
             - "discord://token@id"
           x-oapi-codegen-extra-tags:
             validate: "required,min=1"
+        pushSubscription:
+          $ref: '#/components/schemas/PushSubscription'
+          description: "Optional PWA push subscription for background alerts"
+        reminderThreshold:
+          type: string
+          example: "30m"
+          pattern: '^[0-9]+[smh]$'
+          description: "How long before expiration to send a PWA reminder"
+        reminderSent:
+          type: boolean
+          readOnly: true
         sent:
           type: boolean
           readOnly: true
@@ -253,3 +294,15 @@ components:
           format: date-time
           example: "2026-01-25T13:45:00Z"
           readOnly: true
+    PushSubscription:
+      type: object
+      properties:
+        endpoint:
+          type: string
+        keys:
+          type: object
+          properties:
+            p256dh:
+              type: string
+            auth:
+              type: string

@@ -1,15 +1,20 @@
 {
-  "name": "Dead Mans Switch",
-  "short_name": "DMS",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#6366f1",
+  "short_name": "Dead Man's Switch",
+  "name": "Dead Man's Switch",
+  "id": "dead-mans-switch-local",
+  "description": "Safety monitoring and automated notification system.",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3541/3541850.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/15151/15151343.png",
+      "type": "image/png",
       "sizes": "512x512",
-      "type": "image/png"
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#6366f1",
+  "background_color": "#0a0a0a"
 }

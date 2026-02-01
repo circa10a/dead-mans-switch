@@ -37,23 +37,35 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// PushSubscription defines model for PushSubscription.
+type PushSubscription struct {
+	Endpoint *string `json:"endpoint,omitempty"`
+	Keys     *struct {
+		Auth   *string `json:"auth,omitempty"`
+		P256dh *string `json:"p256dh,omitempty"`
+	} `json:"keys,omitempty"`
+}
+
 // Switch defines model for Switch.
 type Switch struct {
-	CheckInInterval string     `json:"checkInInterval" validate:"required"`
-	DeleteAfterSent bool       `json:"deleteAfterSent"`
-	Encrypted       *bool      `json:"encrypted,omitempty"`
-	Id              *int       `json:"id,omitempty"`
-	Message         string     `json:"message" validate:"required,min=1"`
-	Notifiers       []string   `json:"notifiers" validate:"required,min=1"`
-	SendAt          *time.Time `json:"sendAt,omitempty"`
-	Sent            *bool      `json:"sent,omitempty"`
+	CheckInInterval  string            `json:"checkInInterval" validate:"required"`
+	DeleteAfterSent  bool              `json:"deleteAfterSent"`
+	Disabled         bool              `json:"disabled"`
+	Encrypted        bool              `json:"encrypted"`
+	Id               *int              `json:"id,omitempty"`
+	Message          string            `json:"message" validate:"required,min=1"`
+	Notifiers        []string          `json:"notifiers" validate:"required,min=1"`
+	PushSubscription *PushSubscription `json:"pushSubscription,omitempty"`
+	ReminderSent     *bool             `json:"reminderSent,omitempty"`
+
+	// ReminderThreshold How long before expiration to send a PWA reminder
+	ReminderThreshold *string    `json:"reminderThreshold,omitempty"`
+	SendAt            *time.Time `json:"sendAt,omitempty"`
+	Sent              *bool      `json:"sent,omitempty"`
 }
 
 // GetSwitchParams defines parameters for GetSwitch.
 type GetSwitchParams struct {
-	// Sent Filter switches by their "sent" (triggered) status
-	Sent *bool `form:"sent,omitempty" json:"sent,omitempty"`
-
 	// Limit Limit the number of switches returned (default is 100)
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
@@ -159,8 +171,14 @@ type ClientInterface interface {
 
 	PutSwitchId(ctx context.Context, id int, body PutSwitchIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostSwitchIdDisable request
+	PostSwitchIdDisable(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PostSwitchIdReset request
 	PostSwitchIdReset(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetVapid request
+	GetVapid(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -259,8 +277,32 @@ func (c *Client) PutSwitchId(ctx context.Context, id int, body PutSwitchIdJSONRe
 	return c.Client.Do(req)
 }
 
+func (c *Client) PostSwitchIdDisable(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostSwitchIdDisableRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) PostSwitchIdReset(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostSwitchIdResetRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetVapid(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVapidRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -319,22 +361,6 @@ func NewGetSwitchRequest(server string, params *GetSwitchParams) (*http.Request,
 
 	if params != nil {
 		queryValues := queryURL.Query()
-
-		if params.Sent != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sent", runtime.ParamLocationQuery, *params.Sent); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
 
 		if params.Limit != nil {
 
@@ -518,6 +544,40 @@ func NewPutSwitchIdRequestWithBody(server string, id int, contentType string, bo
 	return req, nil
 }
 
+// NewPostSwitchIdDisableRequest generates requests for PostSwitchIdDisable
+func NewPostSwitchIdDisableRequest(server string, id int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/switch/%s/disable", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewPostSwitchIdResetRequest generates requests for PostSwitchIdReset
 func NewPostSwitchIdResetRequest(server string, id int) (*http.Request, error) {
 	var err error
@@ -545,6 +605,33 @@ func NewPostSwitchIdResetRequest(server string, id int) (*http.Request, error) {
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetVapidRequest generates requests for GetVapid
+func NewGetVapidRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/vapid")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -617,8 +704,14 @@ type ClientWithResponsesInterface interface {
 
 	PutSwitchIdWithResponse(ctx context.Context, id int, body PutSwitchIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PutSwitchIdResponse, error)
 
+	// PostSwitchIdDisableWithResponse request
+	PostSwitchIdDisableWithResponse(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*PostSwitchIdDisableResponse, error)
+
 	// PostSwitchIdResetWithResponse request
 	PostSwitchIdResetWithResponse(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*PostSwitchIdResetResponse, error)
+
+	// GetVapidWithResponse request
+	GetVapidWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVapidResponse, error)
 }
 
 type GetHealthResponse struct {
@@ -761,6 +854,29 @@ func (r PutSwitchIdResponse) StatusCode() int {
 	return 0
 }
 
+type PostSwitchIdDisableResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Switch
+	JSON404      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r PostSwitchIdDisableResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostSwitchIdDisableResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type PostSwitchIdResetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -778,6 +894,27 @@ func (r PostSwitchIdResetResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r PostSwitchIdResetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetVapidResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r GetVapidResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetVapidResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -854,6 +991,15 @@ func (c *ClientWithResponses) PutSwitchIdWithResponse(ctx context.Context, id in
 	return ParsePutSwitchIdResponse(rsp)
 }
 
+// PostSwitchIdDisableWithResponse request returning *PostSwitchIdDisableResponse
+func (c *ClientWithResponses) PostSwitchIdDisableWithResponse(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*PostSwitchIdDisableResponse, error) {
+	rsp, err := c.PostSwitchIdDisable(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostSwitchIdDisableResponse(rsp)
+}
+
 // PostSwitchIdResetWithResponse request returning *PostSwitchIdResetResponse
 func (c *ClientWithResponses) PostSwitchIdResetWithResponse(ctx context.Context, id int, reqEditors ...RequestEditorFn) (*PostSwitchIdResetResponse, error) {
 	rsp, err := c.PostSwitchIdReset(ctx, id, reqEditors...)
@@ -861,6 +1007,15 @@ func (c *ClientWithResponses) PostSwitchIdResetWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParsePostSwitchIdResetResponse(rsp)
+}
+
+// GetVapidWithResponse request returning *GetVapidResponse
+func (c *ClientWithResponses) GetVapidWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVapidResponse, error) {
+	rsp, err := c.GetVapid(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetVapidResponse(rsp)
 }
 
 // ParseGetHealthResponse parses an HTTP response from a GetHealthWithResponse call
@@ -1075,6 +1230,39 @@ func ParsePutSwitchIdResponse(rsp *http.Response) (*PutSwitchIdResponse, error) 
 	return response, nil
 }
 
+// ParsePostSwitchIdDisableResponse parses an HTTP response from a PostSwitchIdDisableWithResponse call
+func ParsePostSwitchIdDisableResponse(rsp *http.Response) (*PostSwitchIdDisableResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostSwitchIdDisableResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Switch
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParsePostSwitchIdResetResponse parses an HTTP response from a PostSwitchIdResetWithResponse call
 func ParsePostSwitchIdResetResponse(rsp *http.Response) (*PostSwitchIdResetResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1103,6 +1291,22 @@ func ParsePostSwitchIdResetResponse(rsp *http.Response) (*PostSwitchIdResetRespo
 		}
 		response.JSON404 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseGetVapidResponse parses an HTTP response from a GetVapidWithResponse call
+func ParseGetVapidResponse(rsp *http.Response) (*GetVapidResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetVapidResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil

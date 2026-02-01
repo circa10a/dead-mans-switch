@@ -11,7 +11,7 @@ import (
 )
 
 func TestHealthHandleFunc(t *testing.T) {
-	store, err := database.New(t.TempDir(), false)
+	store, err := database.New(t.TempDir())
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}

@@ -2,12 +2,14 @@ package server
 
 import (
 	"context"
-	_ "embed"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -21,6 +23,7 @@ import (
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
 	"github.com/circa10a/dead-mans-switch/internal/server/handlers"
 	"github.com/circa10a/dead-mans-switch/internal/server/middleware"
+	"github.com/circa10a/dead-mans-switch/internal/server/secrets"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -30,11 +33,8 @@ const (
 	defaultWorkerBatchSize = 1000
 )
 
-//go:embed web/ui.html
-var indexHTML []byte
-
-//go:embed web/manifest.json
-var manifestJSON []byte
+//go:embed web/*
+var webAssets embed.FS
 
 //go:embed api.html
 var apiDocs []byte
@@ -43,29 +43,30 @@ var apiDocs []byte
 type Server struct {
 	Config
 
-	ctx         context.Context
-	cancel      context.CancelFunc
-	mux         http.Handler
-	logger      *slog.Logger
-	middlewares []func(http.Handler) http.Handler
-	Worker      *Worker
+	ctx            context.Context
+	cancel         context.CancelFunc
+	mux            http.Handler
+	logger         *slog.Logger
+	middlewares    []func(http.Handler) http.Handler
+	VAPIDPublicKey string
+	Worker         *Worker
 }
 
 // Config holds configuration for creating a Server.
 type Config struct {
-	AutoTLS           bool
-	Domains           []string
-	EncryptionEnabled bool
-	LogFormat         string
-	LogLevel          string
-	Metrics           bool
-	Port              int
-	StorageDir        string
-	TLSCert           string
-	TLSKey            string
-	Validation        bool
-	WorkerBatchSize   int
-	WorkerInterval    time.Duration
+	AutoTLS         bool
+	ContactEmail    string
+	Domains         []string
+	LogFormat       string
+	LogLevel        string
+	Metrics         bool
+	Port            int
+	StorageDir      string
+	TLSCert         string
+	TLSKey          string
+	Validation      bool
+	WorkerBatchSize int
+	WorkerInterval  time.Duration
 }
 
 // New returns a new server configured from cfg.
@@ -117,7 +118,7 @@ func New(cfg *Config) (*Server, error) {
 	server.logger = slog.New(logHandler)
 
 	// Database
-	db, err := database.New(server.StorageDir, server.EncryptionEnabled)
+	db, err := database.New(server.StorageDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
@@ -127,12 +128,29 @@ func New(cfg *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create database tables: %w", err)
 	}
 
+	// Create VAPID keys for push notifications
+	vapidPrivPath := filepath.Join(server.StorageDir, "vapid.priv")
+	vapidPubPath := filepath.Join(server.StorageDir, "vapid.pub")
+
+	priv, pub, err := secrets.LoadOrCreateVAPIDKeys(vapidPrivPath, vapidPubPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize VAPID keys: %w", err)
+	}
+
+	// Server serves the key
+	server.VAPIDPublicKey = pub
+
 	// Worker
 	server.Worker = &Worker{
-		Store:     db,
-		Interval:  server.WorkerInterval,
-		BatchSize: server.WorkerBatchSize,
-		Logger:    server.logger,
+		Store:           db,
+		Interval:        server.WorkerInterval,
+		BatchSize:       server.WorkerBatchSize,
+		Logger:          server.logger,
+		SubscriberEmail: server.ContactEmail,
+		// Worker validates the sub claim
+		VAPIDPublicKey: server.VAPIDPublicKey,
+		// Worker signs the push
+		VAPIDPrivateKey: priv,
 	}
 	go server.Worker.Start(server.ctx)
 
@@ -162,30 +180,50 @@ func New(cfg *Config) (*Server, error) {
 
 	// Switches
 	switchHandler := &handlers.Switch{
-		Validator: validator.New(),
-		Store:     db,
-		Logger:    server.logger,
+		Store:  db,
+		Logger: server.logger,
 	}
 
-	// Apply the middleware only to where switches are created
-	router.With(middleware.NotifierValidator).Post("/switch", switchHandler.PostHandleFunc)
-	router.Get("/switch", switchHandler.GetHandleFunc)
-	router.Get("/switch/{id}", switchHandler.GetByIDHandleFunc)
-	router.Put("/switch/{id}", switchHandler.PutByIDHandleFunc)
-	router.Delete("/switch/{id}", switchHandler.DeleteHandleFunc)
-	router.Post("/switch/{id}/reset", switchHandler.ResetHandleFunc)
+	validator := validator.New()
+
+	// Mount API v1 routes
+	router.Route("/api/v1", func(r chi.Router) {
+		// Group routes that require the validation middlewares
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.SwitchValidator(validator))
+			r.Use(middleware.NotifierValidator)
+
+			r.Post("/switch", switchHandler.PostHandleFunc)
+			r.Put("/switch/{id}", switchHandler.PutByIDHandleFunc)
+		})
+
+		// Standard routes (No body validation needed)
+		r.Get("/switch", switchHandler.GetHandleFunc)
+		r.Get("/switch/{id}", switchHandler.GetByIDHandleFunc)
+		r.Delete("/switch/{id}", switchHandler.DeleteHandleFunc)
+		r.Post("/switch/{id}/reset", switchHandler.ResetHandleFunc)
+		r.Post("/switch/{id}/disable", switchHandler.DisableHandleFunc)
+
+		// VAPID key for push notifications
+		r.Get("/vapid", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte(server.VAPIDPublicKey))
+		})
+	})
 
 	// UI
+	publicFS, err := fs.Sub(webAssets, "web")
+	if err != nil {
+		return server, err
+	}
+	fileServer := http.FileServer(http.FS(publicFS))
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		content, _ := webAssets.ReadFile("web/index.html")
 		w.Header().Set("Content-Type", "text/html")
-		w.Write(indexHTML)
-	})
-	// PWA manifest
-	router.Get("/manifest.json", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(manifestJSON)
+		_, _ = w.Write(content)
 	})
 
+	router.Handle("/*", fileServer)
 	return server, nil
 }
 
@@ -197,7 +235,7 @@ func (s *Server) Start() error {
 	if s.AutoTLS {
 		log.Info("Starting server on :80 and :443")
 		certmagic.DefaultACME.Agreed = true
-		certmagic.DefaultACME.Email = "user@oss.com"
+		certmagic.DefaultACME.Email = s.ContactEmail
 		return certmagic.HTTPS(s.Domains, s.mux)
 	}
 
@@ -226,7 +264,7 @@ func (s *Server) Start() error {
 
 // Stop stops the server.
 func (s *Server) Stop() {
-	s.logger.Info("shutting down server")
+	s.logger.Info("Shutting down server")
 	s.cancel()
 }
 

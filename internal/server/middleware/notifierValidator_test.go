@@ -58,7 +58,7 @@ func TestNotifierValidator(t *testing.T) {
 			payload: api.Switch{
 				Notifiers: []string{},
 			},
-			// Shoutrrr doesn't validate empty lists, but your
+			// Shoutrrr doesn't validate empty lists, but
 			// 'min=1' struct validation will catch this later.
 			// However, if the middleware loops, it will just pass through.
 			expectedStatus: http.StatusOK,
