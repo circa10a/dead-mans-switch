@@ -17,7 +17,7 @@ import (
 // contextKey is a private type to avoid collisions in context
 type contextKey string
 
-// SwitchContextKey is the context key for accessing the value of a validated switch in handlers.
+// SwitchContextKey is the context key for accessing the value of a validated switch in
 const SwitchContextKey contextKey = "validatedSwitch"
 
 // FromContext grabs a Switch payload from the context to ensure we only read the body once

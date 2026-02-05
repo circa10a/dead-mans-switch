@@ -16,10 +16,6 @@ type Store interface {
 	GetExpired(limit int) ([]api.Switch, error)
 	// GetEligibleReminders retrieves switches that are approaching expiry but haven't had a PWA reminder sent yet.
 	GetEligibleReminders(limit int) ([]api.Switch, error)
-	// ReminderSent flags a switch so the PWA reminder isn't sent repeatedly in the same cycle.
-	ReminderSent(id int) error
-	// Sent marks a specific switch as having been processed/sent.
-	Sent(id int) error
 	// Update modifies an existing switch's message, notifiers, and interval.
 	Update(id int, sw api.Switch) (api.Switch, error)
 	// Delete removes a switch record from the store.
@@ -28,6 +24,14 @@ type Store interface {
 	Reset(id int) error
 	// Disable disables a switch to it will not be monitored.
 	Disable(id int) error
+	// ReminderSent flags a switch so the PWA reminder isn't sent repeatedly in the same cycle.
+	ReminderSent(id int) error
+	// Sent marks a specific switch as having been processed/sent.
+	Sent(id int) error
+	// Encrypt encrypts sensitive content.
+	EncryptSwitch(*api.Switch) error
+	// Decrypt encrypts sensitive content.
+	DecryptSwitch(*api.Switch) error
 	// Ping verifies the database connection is alive.
 	Ping() error
 	// Close terminates the database connection.

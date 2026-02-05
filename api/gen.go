@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/oapi-codegen/runtime"
 )
@@ -59,9 +58,11 @@ type Switch struct {
 	ReminderSent     *bool             `json:"reminderSent,omitempty"`
 
 	// ReminderThreshold How long before expiration to send a PWA reminder
-	ReminderThreshold *string    `json:"reminderThreshold,omitempty"`
-	SendAt            *time.Time `json:"sendAt,omitempty"`
-	Sent              *bool      `json:"sent,omitempty"`
+	ReminderThreshold *string `json:"reminderThreshold,omitempty"`
+
+	// SendAt Time to send in Unix time format
+	SendAt *int64 `json:"sendAt,omitempty"`
+	Sent   *bool  `json:"sent,omitempty"`
 }
 
 // GetSwitchParams defines parameters for GetSwitch.

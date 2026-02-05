@@ -244,6 +244,8 @@ components:
         - encrypted
         - message
         - notifiers
+        - sendAt
+        - sent
       properties:
         id:
           type: integer
@@ -290,9 +292,10 @@ components:
           type: boolean
           readOnly: true
         sendAt:
-          type: string
-          format: date-time
-          example: "2026-01-25T13:45:00Z"
+          type: integer
+          format: int64
+          description: "Time to send in Unix time format"
+          example: 1737812700
           readOnly: true
     PushSubscription:
       type: object

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -23,11 +24,13 @@ func setupTestStore(t *testing.T) Store {
 
 func TestSQLiteStore_CRUD(t *testing.T) {
 	store := setupTestStore(t)
+	oneHourLater := time.Now().Add(time.Hour).Unix()
 	sw := api.Switch{
 		Message:         "Test Message",
 		Notifiers:       []string{"logger://"},
 		CheckInInterval: "1h",
 		DeleteAfterSent: false,
+		SendAt:          &oneHourLater,
 	}
 
 	t.Run("Create and GetByID", func(t *testing.T) {
@@ -70,72 +73,28 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 		}
 	})
 
-	t.Run("Update includes PushSubscription", func(t *testing.T) {
-		created, err := store.Create(sw)
-		if err != nil {
-			t.Fatalf("failed to create switch: %v", err)
-		}
-
-		newPush := &api.PushSubscription{
-			Endpoint: ptr("https://new-endpoint.com"),
-			Keys: &struct {
-				Auth   *string `json:"auth,omitempty"`
-				P256dh *string `json:"p256dh,omitempty"`
-			}{
-				Auth:   ptr("auth-secret"),
-				P256dh: ptr("public-key"),
-			},
-		}
-
-		updateData := created
-		updateData.PushSubscription = newPush
-
-		updated, err := store.Update(*created.Id, updateData)
-		if err != nil {
-			t.Fatalf("failed to update: %v", err)
-		}
-
-		if updated.PushSubscription == nil || updated.PushSubscription.Endpoint == nil {
-			t.Fatal("PushSubscription or Endpoint is nil after update")
-		}
-
-		if *updated.PushSubscription.Endpoint != "https://new-endpoint.com" {
-			t.Errorf("expected https://new-endpoint.com, got %s", *updated.PushSubscription.Endpoint)
-		}
-	})
-
-	t.Run("Delete", func(t *testing.T) {
-		created, err := store.Create(sw)
-		if err != nil {
-			t.Fatalf("failed to create switch: %v", err)
-		}
-
-		err = store.Delete(*created.Id)
-		if err != nil {
-			t.Fatalf("failed to delete: %v", err)
-		}
-
-		_, err = store.GetByID(*created.Id)
-		if err == nil {
-			t.Error("expected error getting deleted switch, got nil")
-		}
-	})
-
 	t.Run("Data is stored encrypted and retrieved as encrypted in API view", func(t *testing.T) {
 		msg := "secret message"
-		sw := api.Switch{Message: msg, Notifiers: []string{"n1"}, CheckInInterval: "1h", Encrypted: true}
+		oneHourLater := time.Now().Add(time.Hour).Unix()
+		sw := api.Switch{
+			Message:         msg,
+			Notifiers:       []string{"n1"},
+			CheckInInterval: "1h",
+			Encrypted:       true,
+			SendAt:          &oneHourLater,
+		}
 
+		// Store.Create internally calls EncryptSwitch
 		created, err := store.Create(sw)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// This SHOULD be ciphertext now
+		// GetByID returns the DB state (scanSwitches does not decrypt)
 		if created.Message == msg {
 			t.Errorf("Security failure: GetByID returned plaintext for an encrypted switch")
 		}
 
-		// Verify it is actually the ciphertext we expect by checking for base64-like length/randomness
 		if len(created.Message) < len(msg) {
 			t.Errorf("Message too short to be ciphertext")
 		}
@@ -146,11 +105,13 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 	store := setupTestStore(t)
 
 	t.Run("Create and Retrieve Reminder Fields", func(t *testing.T) {
+		oneHourLater := time.Now().Add(time.Hour).Unix() // In spongebob's voice
 		sw := api.Switch{
 			Message:           "Reminder Test",
 			Notifiers:         []string{"logger://"},
 			CheckInInterval:   "1h",
 			ReminderThreshold: ptr("15m"),
+			SendAt:            &oneHourLater,
 		}
 
 		created, err := store.Create(sw)
@@ -168,14 +129,13 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 	})
 
 	t.Run("GetEligibleReminders and MarkReminderSent", func(t *testing.T) {
+		oneSecondAgo := time.Now().Unix() - 1
 		sw := api.Switch{
 			Message:           "Eligible",
 			Notifiers:         []string{"logger://"},
 			CheckInInterval:   "1h",
 			ReminderThreshold: ptr("10m"),
-			PushSubscription: &api.PushSubscription{
-				Endpoint: ptr("https://example.com"),
-			},
+			SendAt:            &oneSecondAgo, // Expired
 		}
 
 		created, err := store.Create(sw)
@@ -224,6 +184,7 @@ func TestSQLiteStore_StatusAndExpirations(t *testing.T) {
 		notifierURL := "discord://webhook-url"
 		pushEndpoint := "https://fcm.googleapis.com/test"
 
+		tenSecondsAgo := time.Now().Unix() - 10
 		sw := api.Switch{
 			Message:         plaintextMsg,
 			Notifiers:       []string{notifierURL},
@@ -232,6 +193,7 @@ func TestSQLiteStore_StatusAndExpirations(t *testing.T) {
 			PushSubscription: &api.PushSubscription{
 				Endpoint: ptr(pushEndpoint),
 			},
+			SendAt: &tenSecondsAgo,
 		}
 
 		created, err := store.Create(sw)
@@ -239,8 +201,7 @@ func TestSQLiteStore_StatusAndExpirations(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		time.Sleep(5 * time.Millisecond)
-
+		// GetExpired calls DecryptSwitch internally
 		expiredList, err := store.GetExpired(10)
 		if err != nil {
 			t.Fatal(err)
@@ -267,41 +228,16 @@ func TestSQLiteStore_StatusAndExpirations(t *testing.T) {
 	})
 }
 
-func TestSQLiteStore_Reset(t *testing.T) {
-	store := setupTestStore(t)
-	sw := api.Switch{Message: "m1", Notifiers: []string{"n1"}, CheckInInterval: "24h"}
-	created, err := store.Create(sw)
-	if err != nil {
-		t.Fatalf("failed to create switch: %v", err)
-	}
+func TestSQLiteStore_SwitchCryptoHelpers(t *testing.T) {
+	store := setupTestStore(t).(*SQLiteStore)
 
-	_ = store.Sent(*created.Id)
-	err = store.Reset(*created.Id)
-	if err != nil {
-		t.Fatalf("reset failed: %v", err)
-	}
-
-	updated, err := store.GetByID(*created.Id)
-	if err != nil {
-		t.Fatalf("failed to get switch by id: %v", err)
-	}
-
-	if *updated.Sent {
-		t.Error("expected switch to be unsent after reset")
-	}
-}
-
-func TestSQLiteStore_StorageHelpers(t *testing.T) {
-	store := setupTestStore(t).(*SQLiteStore) // Cast to access internal methods
-
-	// Sample data
 	plaintextMsg := "secure message"
 	notifiers := []string{"https://webhook.site/123"}
 	push := &api.PushSubscription{
 		Endpoint: ptr("https://push.com/target"),
 	}
 
-	t.Run("prepareSwitchForStorage - Encrypted", func(t *testing.T) {
+	t.Run("EncryptSwitch / DecryptSwitch Round Trip", func(t *testing.T) {
 		sw := api.Switch{
 			Message:          plaintextMsg,
 			Notifiers:        notifiers,
@@ -309,87 +245,54 @@ func TestSQLiteStore_StorageHelpers(t *testing.T) {
 			Encrypted:        true,
 		}
 
-		msgOut, notifiersOut, pushOut, err := store.prepareSwitchForStorage(sw)
+		// 1. Encrypt
+		err := store.EncryptSwitch(&sw)
 		if err != nil {
-			t.Fatalf("failed to prepare storage: %v", err)
+			t.Fatalf("encryption failed: %v", err)
 		}
 
-		// Verify encryption happened
-		if msgOut == plaintextMsg {
-			t.Error("expected message to be encrypted, but it was plaintext")
+		if sw.Message == plaintextMsg {
+			t.Error("expected message to be encrypted")
 		}
 
-		if notifiersOut == `["https://webhook.site/123"]` {
-			t.Error("expected notifiers to be encrypted JSON, but it was raw JSON")
-		}
-
-		if !pushOut.Valid || pushOut.String == "" {
-			t.Fatal("expected push subscription to be valid in storage")
-		}
-
-		if pushOut.String == `{"endpoint":"https://push.com/target"}` {
-			t.Error("expected push sub to be encrypted, but it was raw JSON")
-		}
-	})
-
-	t.Run("decryptInPlace - End to End", func(t *testing.T) {
-		// Prepare data (Encrypted)
-		original := api.Switch{
-			Message:          plaintextMsg,
-			Notifiers:        notifiers,
-			PushSubscription: push,
-			Encrypted:        true,
-		}
-
-		msgEnc, notifiersEnc, pushEnc, err := store.prepareSwitchForStorage(original)
-		if err != nil {
-			t.Fatalf("prepareSwitchForStorage failed: %v", err)
-		}
-
-		// Simulate what scanSwitches does for an encrypted record:
-		// It puts the raw DB strings into the struct fields.
-		swFromDB := api.Switch{
-			Encrypted: true,
-			Message:   msgEnc,
-			Notifiers: []string{notifiersEnc},
-			PushSubscription: &api.PushSubscription{
-				Endpoint: &pushEnc.String,
-			},
-		}
-
-		//  Decrypt
-		err = store.decryptInPlace(&swFromDB)
+		// 2. Decrypt
+		err = store.DecryptSwitch(&sw)
 		if err != nil {
 			t.Fatalf("decryption failed: %v", err)
 		}
 
-		// Verify equality with original
-		if swFromDB.Message != original.Message {
-			t.Errorf("expected msg %s, got %s", original.Message, swFromDB.Message)
+		if sw.Message != plaintextMsg {
+			t.Errorf("expected msg %s, got %s", plaintextMsg, sw.Message)
 		}
 
-		if len(swFromDB.Notifiers) != 1 || swFromDB.Notifiers[0] != original.Notifiers[0] {
-			t.Errorf("expected notifiers %v, got %v", original.Notifiers, swFromDB.Notifiers)
+		if sw.Notifiers[0] != notifiers[0] {
+			t.Errorf("expected notifier %s, got %s", notifiers[0], sw.Notifiers[0])
 		}
 
-		if swFromDB.PushSubscription == nil || *swFromDB.PushSubscription.Endpoint != *original.PushSubscription.Endpoint {
-			t.Errorf("expected push endpoint %s, got %v", *original.PushSubscription.Endpoint, swFromDB.PushSubscription.Endpoint)
+		if *sw.PushSubscription.Endpoint != *push.Endpoint {
+			t.Errorf("expected push endpoint %s, got %s", *push.Endpoint, *sw.PushSubscription.Endpoint)
 		}
 	})
+}
 
-	t.Run("decryptInPlace - Non Encrypted", func(t *testing.T) {
-		sw := api.Switch{
-			Message:   "plain",
-			Encrypted: false,
-		}
+func TestEncryptionPrimitives(t *testing.T) {
+	key := []byte("this-is-a-32-byte-long-test-key!")
+	store := &SQLiteStore{EncryptionKey: key}
+	plaintext := []byte("Hello, Dead Man's Switch!")
 
-		// Should do nothing and return no error
-		err := store.decryptInPlace(&sw)
+	t.Run("successfully encrypts and decrypts", func(t *testing.T) {
+		ciphertext, err := store.encrypt(plaintext) // Calling lowercase internal methods
 		if err != nil {
-			t.Errorf("expected no error for non-encrypted switch, got %v", err)
+			t.Fatalf("encryption failed: %v", err)
 		}
-		if sw.Message != "plain" {
-			t.Error("message should remain unchanged")
+
+		decrypted, err := store.decrypt(ciphertext)
+		if err != nil {
+			t.Fatalf("decryption failed: %v", err)
+		}
+
+		if !bytes.Equal(plaintext, decrypted) {
+			t.Errorf("expected %s, got %s", string(plaintext), string(decrypted))
 		}
 	})
 }

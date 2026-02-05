@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/circa10a/dead-mans-switch/api"
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
@@ -17,6 +18,7 @@ import (
 // Error messages
 const (
 	errInvalidSwitchID      = "Invalid switch ID"
+	errLimitValue           = "Invalid limit value"
 	errSwitchNotFound       = "Switch not found"
 	errDatabaseError        = "Database error"
 	errFailedToDelete       = "Failed to delete switch"
@@ -43,6 +45,15 @@ func (s *Switch) PostHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	duration, err := time.ParseDuration(payload.CheckInInterval)
+	if err != nil {
+		s.sendError(w, http.StatusBadRequest, errInvalidSwitchID, err)
+		return
+	}
+	// Compute time at which to send
+	sendAt := time.Now().Add(duration).Unix()
+	payload.SendAt = &sendAt
+
 	createdSwitch, err := s.Store.Create(payload)
 	if err != nil {
 		s.sendError(w, http.StatusInternalServerError, errDatabaseError, err)
@@ -60,9 +71,12 @@ func (s *Switch) GetHandleFunc(w http.ResponseWriter, r *http.Request) {
 	limit := defaultLimit
 
 	if l := r.URL.Query().Get("limit"); l != "" {
-		if val, err := strconv.Atoi(l); err == nil && val > 0 {
-			limit = val
+		val, err := strconv.Atoi(l)
+		if err != nil && val > 0 {
+			s.sendError(w, http.StatusBadRequest, errLimitValue, err)
+			return
 		}
+		limit = val
 	}
 
 	foundSwitches, err := s.Store.GetAll(limit)
@@ -119,6 +133,31 @@ func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		s.sendError(w, http.StatusInternalServerError, "Internal context error", nil)
 		return
+	}
+
+	// Get existing checkInInterval, if changed, set the new time
+	previousSwitch, err := s.Store.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
+			return
+		}
+		s.sendError(w, http.StatusInternalServerError, errDatabaseError, err)
+		return
+	}
+
+	// Keep existing send time
+	payload.SendAt = previousSwitch.SendAt
+
+	// Change send time if checkInInterval changed
+	if previousSwitch.CheckInInterval != payload.CheckInInterval {
+		duration, err := time.ParseDuration(payload.CheckInInterval)
+		if err != nil {
+			s.sendError(w, http.StatusBadRequest, errInvalidSwitchID, err)
+			return
+		}
+		updatedSendAt := time.Now().Add(duration).Unix()
+		payload.SendAt = &updatedSendAt
 	}
 
 	updatedSwitch, err := s.Store.Update(id, payload)

@@ -2,10 +2,15 @@ package database
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -68,39 +73,55 @@ func (s *SQLiteStore) Init() error {
 
 // Create inserts a new switch into the database, handling encryption if a key is present.
 func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
-	msg, notifiers, push, err := s.prepareSwitchForStorage(sw)
+	err := s.EncryptSwitch(&sw)
 	if err != nil {
 		return api.Switch{}, err
 	}
 
-	// TODO Handle in handler
-	checkInInterval, err := time.ParseDuration(sw.CheckInInterval)
-	if err != nil {
-		return api.Switch{}, fmt.Errorf("invalid checkInInterval: %w", err)
+	// Prepare Notifiers for SQL
+	// If not encrypted, it's a slice and needs to be JSON
+	var notifiers any = sw.Notifiers
+	if !sw.Encrypted {
+		notifiersJSON, err := json.Marshal(sw.Notifiers)
+		if err != nil {
+			return api.Switch{}, err
+		}
+		notifiers = string(notifiersJSON)
+	} else {
+		// If encrypted, EncryptSwitch already turned Notifiers into a
+		// 1-element slice containing the ciphertext string
+		notifiers = sw.Notifiers[0]
 	}
 
-	if sw.ReminderThreshold != nil {
-		_, err = time.ParseDuration(*sw.ReminderThreshold)
-		if err != nil {
-			return api.Switch{}, fmt.Errorf("invalid reminderThreshold: %w", err)
+	// Prepare PushSubscription for SQL
+	var pushSubscription any = nil
+	if sw.PushSubscription != nil {
+		if sw.Encrypted {
+			// Already encrypted string pointer
+			pushSubscription = sw.PushSubscription.Endpoint
+		} else {
+			// Needs to be raw JSON
+			pushJSON, err := json.Marshal(sw.PushSubscription)
+			if err != nil {
+				return api.Switch{}, err
+			}
+			pushSubscription = string(pushJSON)
 		}
 	}
 
-	// TODO handle in handler
-	sendAt := time.Now().UTC().Add(checkInInterval)
 	query := `INSERT INTO switches (message, notifiers, send_at, sent, check_in_interval, delete_after_sent, disabled, encrypted, push_subscription, reminder_threshold, reminder_sent)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	res, err := s.db.Exec(query,
-		msg,
+		sw.Message,
 		notifiers,
-		sendAt.Format(time.RFC3339),
+		sw.SendAt,
 		false,
 		sw.CheckInInterval,
 		sw.DeleteAfterSent,
 		sw.Disabled,
 		sw.Encrypted,
-		push,
+		pushSubscription,
 		sw.ReminderThreshold,
 		false,
 	)
@@ -154,7 +175,7 @@ func (s *SQLiteStore) GetByID(id int) (api.Switch, error) {
 // GetExpired returns switches that have timed out and are ready for notification.
 // Switch data will be decrypted so that can be sent appropriately.
 func (s *SQLiteStore) GetExpired(limit int) ([]api.Switch, error) {
-	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE sent = 0 AND disabled = 0 AND send_at <= ? LIMIT ?", switchColumns), time.Now().UTC().Format(time.RFC3339), limit)
+	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE sent = 0 AND disabled = 0 AND send_at <= ? LIMIT ?", switchColumns), time.Now().Unix(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +188,7 @@ func (s *SQLiteStore) GetExpired(limit int) ([]api.Switch, error) {
 	}
 
 	for i := range switches {
-		err := s.decryptInPlace(&switches[i])
+		err := s.DecryptSwitch(&switches[i])
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +213,7 @@ func (s *SQLiteStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
 	}
 
 	for i := range switches {
-		err := s.decryptInPlace(&switches[i])
+		err := s.DecryptSwitch(&switches[i])
 		if err != nil {
 			return nil, err
 		}
@@ -201,45 +222,57 @@ func (s *SQLiteStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
 	return switches, nil
 }
 
-// ReminderSent marks the reminder on the switch with the given ID as sent.
-func (s *SQLiteStore) ReminderSent(id int) error {
-	_, err := s.db.Exec(`UPDATE switches SET reminder_sent = 1 WHERE id = ?`, id)
-	return err
-}
-
-// Sent marks the switch with the given ID as sent.
-func (s *SQLiteStore) Sent(id int) error {
-	_, err := s.db.Exec(`UPDATE switches SET sent = ? WHERE id = ?`, true, id)
-	return err
-}
-
 // Update updates an existing switch's configuration and resets its expiration timer.
 func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 	// Encrypted fields
-	msg, notifiers, push, err := s.prepareSwitchForStorage(sw)
+	err := s.EncryptSwitch(&sw)
 	if err != nil {
 		return api.Switch{}, err
 	}
 
-	// TODO, handle in update handler
-	duration, err := time.ParseDuration(sw.CheckInInterval)
-	if err != nil {
-		return api.Switch{}, err
+	// Prepare Notifiers for SQL
+	// If not encrypted, it's a slice and needs to be JSON
+	var notifiers any = sw.Notifiers
+	if !sw.Encrypted {
+		notifiersJSON, err := json.Marshal(sw.Notifiers)
+		if err != nil {
+			return api.Switch{}, err
+		}
+		notifiers = string(notifiersJSON)
+	} else {
+		// If encrypted, EncryptSwitch already turned Notifiers into a
+		// 1-element slice containing the ciphertext string
+		notifiers = sw.Notifiers[0]
 	}
 
-	sendAt := time.Now().UTC().Add(duration)
+	// Prepare PushSubscription for SQL
+	var pushSubscription any = nil
+	if sw.PushSubscription != nil {
+		if sw.Encrypted {
+			// Already encrypted string pointer
+			pushSubscription = sw.PushSubscription.Endpoint
+		} else {
+			// Needs to be raw JSON
+			pushJSON, err := json.Marshal(sw.PushSubscription)
+			if err != nil {
+				return api.Switch{}, err
+			}
+			pushSubscription = string(pushJSON)
+		}
+	}
+
 	query := `UPDATE switches SET message=?, notifiers=?, check_in_interval=?, send_at=?, disabled=?, encrypted=?, delete_after_sent=?, sent=0, push_subscription=?, reminder_threshold=?, reminder_sent=0 WHERE id=?`
 
 	res, err := s.db.Exec(
 		query,
-		msg,
+		sw.Message,
 		notifiers,
 		sw.CheckInInterval,
-		sendAt.Format(time.RFC3339),
+		sw.SendAt,
 		sw.Disabled,
 		sw.Encrypted,
 		sw.DeleteAfterSent,
-		push,
+		pushSubscription,
 		sw.ReminderThreshold,
 		id,
 	)
@@ -279,10 +312,10 @@ func (s *SQLiteStore) Reset(id int) error {
 		return fmt.Errorf("invalid duration format: %w", err)
 	}
 
-	newSendAt := time.Now().UTC().Add(duration)
+	newSendAt := time.Now().UTC().Add(duration).Unix()
 	updateQuery := `UPDATE switches SET disabled = 0, send_at = ?, sent = 0, reminder_sent = 0 WHERE id = ?`
 
-	result, err := s.db.Exec(updateQuery, newSendAt.Format(time.RFC3339), id)
+	result, err := s.db.Exec(updateQuery, newSendAt, id)
 	if err != nil {
 		return err
 	}
@@ -319,6 +352,18 @@ func (s *SQLiteStore) Disable(id int) error {
 	return nil
 }
 
+// ReminderSent marks the reminder on the switch with the given ID as sent.
+func (s *SQLiteStore) ReminderSent(id int) error {
+	_, err := s.db.Exec(`UPDATE switches SET reminder_sent = 1 WHERE id = ?`, id)
+	return err
+}
+
+// Sent marks the switch with the given ID as sent.
+func (s *SQLiteStore) Sent(id int) error {
+	_, err := s.db.Exec(`UPDATE switches SET sent = ? WHERE id = ?`, true, id)
+	return err
+}
+
 // Close closes the connection to the SQLite database.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
@@ -339,23 +384,22 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		sw := api.Switch{}
 		var msgRaw string
 		var notifiersRaw string
-		var sendAtRaw string
 		var pushRaw sql.NullString
-		var remindIntRaw sql.NullString
+		var reminderThresholdRaw sql.NullString
 		var reminderSentBool bool
 
 		err := rows.Scan(
 			&sw.Id,
 			&msgRaw,
 			&notifiersRaw,
-			&sendAtRaw,
+			&sw.SendAt,
 			&sw.Sent,
 			&sw.CheckInInterval,
 			&sw.DeleteAfterSent,
 			&sw.Disabled,
 			&sw.Encrypted,
 			&pushRaw,
-			&remindIntRaw,
+			&reminderThresholdRaw,
 			&reminderSentBool,
 		)
 		if err != nil {
@@ -363,17 +407,11 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		}
 
 		// Basic fields
-		if remindIntRaw.Valid {
-			val := remindIntRaw.String
+		if reminderThresholdRaw.Valid {
+			val := reminderThresholdRaw.String
 			sw.ReminderThreshold = &val
 		}
 		sw.ReminderSent = &reminderSentBool
-		sendAt, err := time.Parse(time.RFC3339, sendAtRaw)
-		if err != nil {
-			return nil, err
-		}
-
-		sw.SendAt = &sendAt
 
 		// Field Mapping
 		sw.Message = msgRaw
@@ -405,57 +443,42 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 	return switches, nil
 }
 
-// prepareSwitchForStorage encrypts sensitive switch fields before storing
-func (s *SQLiteStore) prepareSwitchForStorage(sw api.Switch) (string, string, sql.NullString, error) {
-	var msgStore string
-	var notifiersStore string
-	var pushStore sql.NullString
+// EncryptSwitch encrypts sensitive switch fields before storing
+func (s *SQLiteStore) EncryptSwitch(sw *api.Switch) error {
+	if !sw.Encrypted {
+		return nil
+	}
 
-	// Marshal Notifiers
-	notifiersJSON, err := json.Marshal(sw.Notifiers)
+	// Encrypt Message
+	encMsg, err := s.encrypt([]byte(sw.Message))
 	if err != nil {
-		return "", "", pushStore, fmt.Errorf("marshal notifiers: %w", err)
+		return err
 	}
-	notifiersStore = string(notifiersJSON)
-	msgStore = sw.Message
+	sw.Message = encMsg
 
-	// Marshal Push Sub
-	if sw.PushSubscription != nil && sw.PushSubscription.Endpoint != nil {
-		pushJSON, err := json.Marshal(sw.PushSubscription)
-		if err != nil {
-			return "", "", pushStore, fmt.Errorf("marshal push: %w", err)
-		}
-		pushStore = sql.NullString{String: string(pushJSON), Valid: true}
+	// Encrypt Notifiers
+	notifiersJSON, _ := json.Marshal(sw.Notifiers)
+	encNotifiers, err := s.encrypt(notifiersJSON)
+	if err != nil {
+		return err
 	}
+	sw.Notifiers = []string{encNotifiers}
 
-	// Encrypt if requested
-	if sw.Encrypted {
-		encMsg, err := s.encrypt([]byte(sw.Message))
+	// Encrypt Push
+	if sw.PushSubscription != nil {
+		pushJSON, _ := json.Marshal(sw.PushSubscription)
+		encPush, err := s.encrypt(pushJSON)
 		if err != nil {
-			return "", "", pushStore, fmt.Errorf("encrypt message: %w", err)
+			return err
 		}
-		msgStore = encMsg
-
-		encNotifiers, err := s.encrypt(notifiersJSON)
-		if err != nil {
-			return "", "", pushStore, fmt.Errorf("encrypt notifiers: %w", err)
-		}
-		notifiersStore = encNotifiers
-
-		if pushStore.Valid {
-			encPush, err := s.encrypt([]byte(pushStore.String))
-			if err != nil {
-				return "", "", pushStore, fmt.Errorf("encrypt push: %w", err)
-			}
-			pushStore.String = encPush
-		}
+		sw.PushSubscription = &api.PushSubscription{Endpoint: &encPush}
 	}
 
-	return msgStore, notifiersStore, pushStore, nil
+	return nil
 }
 
-// decryptInPlace decrypts sensitive switch fields for the worker to properly send notifications.
-func (s *SQLiteStore) decryptInPlace(sw *api.Switch) error {
+// DecryptSwitch decrypts sensitive switch fields in place for use in workers or API responses.
+func (s *SQLiteStore) DecryptSwitch(sw *api.Switch) error {
 	if !sw.Encrypted {
 		return nil
 	}
@@ -463,35 +486,86 @@ func (s *SQLiteStore) decryptInPlace(sw *api.Switch) error {
 	// Decrypt Message
 	decryptedMessage, err := s.decrypt(sw.Message)
 	if err != nil {
-		return fmt.Errorf("msg decryption: %w", err)
+		return fmt.Errorf("message decryption failed: %w", err)
 	}
 	sw.Message = string(decryptedMessage)
 
-	// Decrypt Notifiers (Expected to be the first element in API view)
+	// Decrypt Notifiers
 	if len(sw.Notifiers) > 0 {
 		decryptedNotifiers, err := s.decrypt(sw.Notifiers[0])
 		if err != nil {
-			return fmt.Errorf("notifiers decryption: %w", err)
+			return fmt.Errorf("notifiers decryption failed: %w", err)
 		}
-		err = json.Unmarshal(decryptedNotifiers, &sw.Notifiers)
-		if err != nil {
-			return fmt.Errorf("notifiers unmarshal: %w", err)
+		if err := json.Unmarshal(decryptedNotifiers, &sw.Notifiers); err != nil {
+			return fmt.Errorf("notifiers unmarshal failed: %w", err)
 		}
 	}
 
 	// Decrypt Push Subscription
 	if sw.PushSubscription != nil && sw.PushSubscription.Endpoint != nil {
-		decryptedPushSubscription, err := s.decrypt(*sw.PushSubscription.Endpoint)
+		decryptedPush, err := s.decrypt(*sw.PushSubscription.Endpoint)
 		if err != nil {
-			return fmt.Errorf("push decryption: %w", err)
+			return fmt.Errorf("push decryption failed: %w", err)
 		}
-		err = json.Unmarshal(decryptedPushSubscription, &sw.PushSubscription)
-		if err != nil {
-			return fmt.Errorf("push unmarshal: %w", err)
+		if err := json.Unmarshal(decryptedPush, &sw.PushSubscription); err != nil {
+			return fmt.Errorf("push unmarshal failed: %w", err)
 		}
 	}
 
 	return nil
+}
+
+func (s *SQLiteStore) encrypt(plaintext []byte) (string, error) {
+	if len(s.EncryptionKey) == 0 {
+		return "", fmt.Errorf("encryption key not configured")
+	}
+
+	block, err := aes.NewCipher(s.EncryptionKey)
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+
+	_, err = io.ReadFull(rand.Reader, nonce)
+	if err != nil {
+		return "", err
+	}
+
+	// Result is nonce + ciphertext
+	return base64.StdEncoding.EncodeToString(gcm.Seal(nonce, nonce, plaintext, nil)), nil
+}
+
+func (s *SQLiteStore) decrypt(cryptoText string) ([]byte, error) {
+	if len(s.EncryptionKey) == 0 {
+		return nil, fmt.Errorf("encryption key not configured")
+	}
+
+	data, err := base64.StdEncoding.DecodeString(cryptoText)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := aes.NewCipher(s.EncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+
+	return gcm.Open(nil, nonce, ciphertext, nil)
 }
 
 // connect is an internal helper that sets up the database connection and directory.

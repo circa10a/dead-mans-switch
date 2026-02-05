@@ -158,15 +158,27 @@ func TestGetHandleFunc(t *testing.T) {
 	s, store := setupTestHandler(t)
 
 	// Seed data: 1 unsent, 2 sent
-	_, err := store.Create(api.Switch{Message: "m1", Notifiers: []string{"active-1"}, CheckInInterval: "1h"})
+	_, err := store.Create(api.Switch{
+		Message:         "m1",
+		Notifiers:       []string{"active-1"},
+		CheckInInterval: "1h",
+	})
 	if err != nil {
 		t.Fatalf("failed to create switch: %v", err)
 	}
-	s2, err := store.Create(api.Switch{Message: "m2", Notifiers: []string{"triggered-1"}, CheckInInterval: "1h"})
+	s2, err := store.Create(api.Switch{
+		Message:         "m2",
+		Notifiers:       []string{"triggered-1"},
+		CheckInInterval: "1h",
+	})
 	if err != nil {
 		t.Fatalf("failed to create switch: %v", err)
 	}
-	s3, err := store.Create(api.Switch{Message: "m3", Notifiers: []string{"triggered-2"}, CheckInInterval: "1h"})
+	s3, err := store.Create(api.Switch{
+		Message:         "m3",
+		Notifiers:       []string{"triggered-2"},
+		CheckInInterval: "1h",
+	})
 	if err != nil {
 		t.Fatalf("failed to create switch: %v", err)
 	}
@@ -180,7 +192,7 @@ func TestGetHandleFunc(t *testing.T) {
 		rec := httptest.NewRecorder()
 		s.GetHandleFunc(rec, req)
 
-		var resp []api.Switch
+		resp := []api.Switch{}
 		err := json.NewDecoder(rec.Body).Decode(&resp)
 		if err != nil {
 			t.Fatalf("failed to decode switch: %v", err)
@@ -271,19 +283,18 @@ func TestPutSwitchId(t *testing.T) {
 	v := validator.New()
 	mw := middleware.SwitchValidator(v)
 
-	// Create initial switch with deleteAfterSent: false
-	initial := api.Switch{
-		Message:         "Original Message",
-		Notifiers:       []string{"generic://general1"},
-		CheckInInterval: "24h",
-		DeleteAfterSent: false,
-	}
-	created, err := store.Create(initial)
-	if err != nil {
-		t.Fatalf("failed to seed switch: %v", err)
-	}
-
 	t.Run("successfully updates an existing switch including deleteAfterSent", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Original Message",
+			Notifiers:       []string{"generic://general1"},
+			CheckInInterval: "24h",
+			DeleteAfterSent: false,
+		}
+		created, err := store.Create(initial)
+		if err != nil {
+			t.Fatalf("failed to seed switch: %v", err)
+		}
+
 		// Toggle deleteAfterSent to true and change other fields
 		updatedPayload := api.Switch{
 			Message:         "Updated Message",
@@ -325,7 +336,174 @@ func TestPutSwitchId(t *testing.T) {
 		}
 	})
 
+	t.Run("successfully updates an existing switch including disabled", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Original Message",
+			Notifiers:       []string{"generic://general1"},
+			CheckInInterval: "24h",
+			DeleteAfterSent: false,
+		}
+		created, err := store.Create(initial)
+		if err != nil {
+			t.Fatalf("failed to seed switch: %v", err)
+		}
+
+		// Toggle disabled to true and change other fields
+		updatedPayload := api.Switch{
+			Message:         "Updated Message for disabled switch",
+			Notifiers:       []string{"generic://general2"},
+			CheckInInterval: "12h",
+			Disabled:        true,
+		}
+		body, err := json.Marshal(updatedPayload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal updated switch: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/switch/%d", *created.Id), bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		r := chi.NewRouter()
+		r.With(mw).Put("/api/v1/switch/{id}", s.PutByIDHandleFunc)
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		resp := api.Switch{}
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		// Verify all fields updated correctly
+		if resp.Disabled != updatedPayload.Disabled {
+			t.Errorf("expected disabled %s, got %s", updatedPayload.Message, resp.Message)
+		}
+	})
+
+	t.Run("ensure sendAt is updated when checkInInterval changed", func(t *testing.T) {
+		createInterval := "24h"
+		updateInterval := "12h"
+		parsedUpdateInterval, _ := time.ParseDuration(updateInterval)
+		expectedSendAt := time.Now().Add(parsedUpdateInterval).Unix()
+
+		initial := api.Switch{
+			Message:         "Original Message",
+			Notifiers:       []string{"generic://general1"},
+			CheckInInterval: createInterval,
+			DeleteAfterSent: false,
+		}
+		created, err := store.Create(initial)
+		if err != nil {
+			t.Fatalf("failed to seed switch: %v", err)
+		}
+
+		// Toggle disabled to true and change other fields
+		updatedPayload := api.Switch{
+			Message:         "Updated Message for disabled switch",
+			Notifiers:       []string{"generic://general2"},
+			CheckInInterval: updateInterval,
+		}
+		body, err := json.Marshal(updatedPayload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal updated switch: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/switch/%d", *created.Id), bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		r := chi.NewRouter()
+		r.With(mw).Put("/api/v1/switch/{id}", s.PutByIDHandleFunc)
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		resp := api.Switch{}
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp.SendAt == nil {
+			t.Fatal("expected sendAt to be non-nil in response")
+		}
+
+		// We allow a 5-second delta to account for execution time
+		delta := *resp.SendAt - expectedSendAt
+		if delta < -5 || delta > 5 {
+			t.Errorf("sendAt was not updated correctly. Expected near %d, got %d (delta: %d seconds)",
+				expectedSendAt, *resp.SendAt, delta)
+		}
+
+		// Optional: Ensure it's significantly different from the "old" calculation
+		// if you want to be extra sure the interval was applied
+		parsedCreateInterval, _ := time.ParseDuration(createInterval)
+		oldExpected := time.Now().Add(parsedCreateInterval).Unix()
+		if *resp.SendAt >= oldExpected {
+			t.Errorf("sendAt seems to still be using the old interval. Got %d, which is >= old expected %d",
+				*resp.SendAt, oldExpected)
+		}
+	})
+
+	t.Run("create new switch and ensure encrypted", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Original Message",
+			Notifiers:       []string{"generic://general1"},
+			CheckInInterval: "24h",
+			DeleteAfterSent: false,
+		}
+		created, err := store.Create(initial)
+		if err != nil {
+			t.Fatalf("failed to seed switch: %v", err)
+		}
+
+		// Toggle disabled to true and change other fields
+		updatedPayload := api.Switch{
+			Message:         "Updated Message for disabled switch",
+			Notifiers:       []string{"generic://general2"},
+			CheckInInterval: "12h",
+			Encrypted:       true,
+		}
+		body, err := json.Marshal(updatedPayload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal updated switch: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/switch/%d", *created.Id), bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		r := chi.NewRouter()
+		r.With(mw).Put("/api/v1/switch/{id}", s.PutByIDHandleFunc)
+		r.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		resp := api.Switch{}
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		// Verify all fields encrypted
+		if resp.Message == updatedPayload.Message {
+			t.Errorf("expected message to be encrypted, but got plaintext %s, got %s", updatedPayload.Message, resp.Message)
+		}
+
+	})
+
 	t.Run("returns 404 for non-existent switch", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Original Message",
+			Notifiers:       []string{"generic://general1"},
+			CheckInInterval: "24h",
+			DeleteAfterSent: false,
+		}
+
 		body, _ := json.Marshal(initial)
 		req := httptest.NewRequest(http.MethodPut, "/api/v1/switch/999", bytes.NewBuffer(body))
 		rec := httptest.NewRecorder()
@@ -428,7 +606,8 @@ func TestResetHandleFunc(t *testing.T) {
 		}
 
 		// Verify sendAt is in the future
-		if resp.SendAt != nil && resp.SendAt.Before(time.Now()) {
+		sendAtTime := time.Unix(*resp.SendAt, 0)
+		if !sendAtTime.After(time.Now()) {
 			t.Error("expected sendAt to be reset to a future time")
 		}
 	})

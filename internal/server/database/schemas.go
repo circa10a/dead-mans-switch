@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS switches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     message TEXT NOT NULL,
     notifiers TEXT NOT NULL,
-    send_at TEXT NOT NULL,
+    send_at INTEGER DEFAULT 0,
     sent BOOLEAN DEFAULT 0,
     check_in_interval TEXT NOT NULL,
     delete_after_sent BOOLEAN DEFAULT 0,

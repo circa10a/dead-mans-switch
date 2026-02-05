@@ -317,8 +317,11 @@
                     { label: '5m', value: '5m' },
                     { label: '30m', value: '30m' },
                     { label: '1h', value: '1h' },
+                    { label: '4h', value: '4h' },
                     { label: '8h', value: '8h' },
-                    { label: '24h', value: '24h' }
+                    { label: '12h', value: '8h' },
+                    { label: '24h', value: '24h' },
+                    { label: '48h', value: '48h' }
                 ],
                 form: {
                     message: '',
@@ -406,25 +409,36 @@
                     return sw.pushSubscription && sw.reminderThreshold && !sw.disabled;
                 },
 
-                isStuck(sw) {
+               isStuck(sw) {
                     if (sw.sent || sw.disabled) return false;
                     const oneHourInMs = 60 * 60 * 1000;
-                    return (this.now - new Date(sw.sendAt).getTime()) > oneHourInMs;
+                    // Multiply by 1000 to convert Unix seconds to JS milliseconds
+                    return (this.now - (sw.sendAt * 1000)) > oneHourInMs;
                 },
 
-                isExpiringSoon(deadline) {
-                    const diff = (new Date(deadline).getTime() - this.now) / 60000; return diff > 0 && diff <= 30;
+               isExpiringSoon(deadline) {
+                    // Convert Unix seconds to JS milliseconds
+                    const diff = ((deadline * 1000) - this.now) / 60000;
+                    return diff > 0 && diff <= 30;
                 },
 
-                isPending(sw) {
-                    return !sw.sent && !sw.disabled && (new Date(sw.sendAt).getTime() - this.now) <= 0;
+               isPending(sw) {
+                    // Compare Unix seconds * 1000
+                    return !sw.sent && !sw.disabled && (sw.sendAt * 1000 - this.now) <= 0;
                 },
 
                 getCountdown(deadline) {
-                    const total = new Date(deadline).getTime() - this.now;
+                    // deadline is Unix seconds
+                    const total = (deadline * 1000) - this.now;
                     if (isNaN(total) || total <= 0) return "00:00:00";
-                    const s = Math.floor((total / 1000) % 60), m = Math.floor((total / 60000) % 60), h = Math.floor((total / 3600000) % 24), d = Math.floor(total / 86400000);
-                    return (d > 0 ? d + 'd ' : '') + [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+                    
+                    const s = Math.floor((total / 1000) % 60), 
+                        m = Math.floor((total / 60000) % 60), 
+                        h = Math.floor((total / 3600000) % 24), 
+                        d = Math.floor(total / 86400000);
+                        
+                    return (d > 0 ? d + 'd ' : '') + 
+                        [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
                 },
 
                 async forcePermission() {

@@ -70,6 +70,12 @@ func (m *MockStore) Reset(id int) error {
 func (m *MockStore) Disable(id int) error {
 	return nil
 }
+func (m *MockStore) EncryptSwitch(*api.Switch) error {
+	return nil
+}
+func (m *MockStore) DecryptSwitch(*api.Switch) error {
+	return nil
+}
 func (m *MockStore) Ping() error {
 	return nil
 }
@@ -108,12 +114,12 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	// Helper to setup a switch with a specific SendAt time
-	createReminderSwitch := func(sendAt time.Time) api.Switch {
+	createReminderSwitch := func(sendAt *int64) api.Switch {
 		return api.Switch{
 			Id:                &testID,
 			Message:           "reminder",
 			ReminderThreshold: ptr("15m"),
-			SendAt:            &sendAt,
+			SendAt:            sendAt,
 			PushSubscription: &api.PushSubscription{
 				Endpoint: ptr("https://fcm.googleapis.com/test"),
 			},
@@ -122,12 +128,12 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 
 	t.Run("should send reminder and mark as sent when inside window", func(t *testing.T) {
 		// Switch expires in 10 minutes, reminder is set for 15 minutes -> We are in the window
-		expiringSoon := time.Now().UTC().Add(10 * time.Minute)
+		expiringSoon := time.Now().Add(10 * time.Minute).Unix()
 
 		mock := &MockStore{
 			GetExpiredFunc: func(limit int) ([]api.Switch, error) { return nil, nil },
 			GetEligibleRemindersFunc: func(limit int) ([]api.Switch, error) {
-				return []api.Switch{createReminderSwitch(expiringSoon)}, nil
+				return []api.Switch{createReminderSwitch(&expiringSoon)}, nil
 			},
 		}
 
@@ -146,12 +152,12 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 
 	t.Run("should NOT process reminder if outside warning window", func(t *testing.T) {
 		// Switch expires in 1 hour, reminder is 15m -> Not time yet
-		expiringLater := time.Now().UTC().Add(1 * time.Hour)
+		expiringLater := time.Now().Add(1 * time.Hour).Unix()
 
 		mock := &MockStore{
 			GetExpiredFunc: func(limit int) ([]api.Switch, error) { return nil, nil },
 			GetEligibleRemindersFunc: func(limit int) ([]api.Switch, error) {
-				return []api.Switch{createReminderSwitch(expiringLater)}, nil
+				return []api.Switch{createReminderSwitch(&expiringLater)}, nil
 			},
 		}
 
@@ -185,6 +191,34 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 		// Because one notifier failed, the aggregate error should have prevented
 		// the database from being updated to "Sent".
 		assert.False(t, mock.SentCalled, "Should not mark as sent if any notifier in the list fails")
+	})
+}
+
+func TestSendWebPush_ReturnsNilWhenSubscriptionIsNil(t *testing.T) {
+	w := &Worker{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	t.Run("returns nil when PushSubscription is nil", func(t *testing.T) {
+		sw := api.Switch{
+			Id:               ptr(1),
+			PushSubscription: nil,
+		}
+
+		err := w.sendWebPush(sw, "Test Title", "Test Body")
+		assert.NoError(t, err)
+	})
+
+	t.Run("returns nil when PushSubscription.Endpoint is nil", func(t *testing.T) {
+		sw := api.Switch{
+			Id: ptr(1),
+			PushSubscription: &api.PushSubscription{
+				Endpoint: nil,
+			},
+		}
+
+		err := w.sendWebPush(sw, "Test Title", "Test Body")
+		assert.NoError(t, err)
 	})
 }
 

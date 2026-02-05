@@ -169,9 +169,6 @@ func New(cfg *Config) (*Server, error) {
 	}
 
 	// Routes
-	// API docs
-	router.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(apiDocs) })
-
 	// Health check
 	healthHandler := &handlers.Health{
 		Store: db,
@@ -196,6 +193,9 @@ func New(cfg *Config) (*Server, error) {
 			r.Post("/switch", switchHandler.PostHandleFunc)
 			r.Put("/switch/{id}", switchHandler.PutByIDHandleFunc)
 		})
+
+		// API docs
+		r.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(apiDocs) })
 
 		// Standard routes (No body validation needed)
 		r.Get("/switch", switchHandler.GetHandleFunc)
