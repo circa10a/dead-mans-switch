@@ -5,7 +5,7 @@
   "description": "Safety monitoring and automated notification system.",
   "icons": [
     {
-      "src": "https://i.imgur.com/E52M9LY.png",
+      "src": "/images/purple-skull-512-maskable-square.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"

@@ -1,8 +1,10 @@
 openapi: 3.0.0
 info:
-  title: Dead Mans Switch API
+  title: Dead Man's Switch API
   description: A REST API to manage dead man's switches.
   version: 1.0.0
+  x-logo:
+    url: /images/purple-skull-512-rounded.png
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development server

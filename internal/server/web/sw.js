@@ -22,8 +22,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: data.body,
-        icon: 'https://cdn-icons-png.flaticon.com/512/15151/15151343.png',
-        badge: 'https://cdn-icons-png.flaticon.com/512/15151/15151343.png',
+        icon: '/images/purple-skull-512-maskable-square.png',
+        badge: '/images/purple-skull-512-maskable-square.png',
         data: data.data,
         vibrate: [200, 100, 200],
         actions: [
