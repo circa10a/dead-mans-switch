@@ -147,8 +147,8 @@ var createSwitchCmd = &cobra.Command{
 			Message:         msg,
 			CheckInInterval: interval.String(),
 			Notifiers:       notifiers,
-			Encrypted:       encrypt,
-			DeleteAfterSent: deleteAfter,
+			Encrypted:       &encrypt,
+			DeleteAfterSent: &deleteAfter,
 		}
 
 		resp, err := client.PostSwitchWithResponse(context.Background(), body)
@@ -205,7 +205,7 @@ var updateSwitchCmd = &cobra.Command{
 			body.Notifiers = notifiers
 		}
 		if cmd.Flags().Changed("delete-after-sent") {
-			body.DeleteAfterSent = deleteAfter
+			body.DeleteAfterSent = &deleteAfter
 		}
 
 		resp, err := client.PutSwitchIdWithResponse(ctx, id, body)

@@ -95,7 +95,7 @@ func TestWorker_Sweep_Success(t *testing.T) {
 					Id:              &testID,
 					Message:         "hello",
 					Notifiers:       []string{validNotifier},
-					DeleteAfterSent: false,
+					DeleteAfterSent: ptr(false),
 				}}, nil
 			},
 			SentFunc: func(id int) error { return nil },
@@ -179,7 +179,7 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 					Id:              &testID,
 					Message:         "fault tolerance test",
 					Notifiers:       []string{"invalid://scheme", "logger://"},
-					DeleteAfterSent: false,
+					DeleteAfterSent: ptr(false),
 				}}, nil
 			},
 			SentFunc: func(id int) error { return nil },

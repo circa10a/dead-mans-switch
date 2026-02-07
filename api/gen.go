@@ -48,9 +48,9 @@ type PushSubscription struct {
 // Switch defines model for Switch.
 type Switch struct {
 	CheckInInterval  string            `json:"checkInInterval" validate:"required"`
-	DeleteAfterSent  bool              `json:"deleteAfterSent"`
-	Disabled         bool              `json:"disabled"`
-	Encrypted        bool              `json:"encrypted"`
+	DeleteAfterSent  *bool             `json:"deleteAfterSent,omitempty"`
+	Disabled         *bool             `json:"disabled,omitempty"`
+	Encrypted        *bool             `json:"encrypted,omitempty"`
 	Id               *int              `json:"id,omitempty"`
 	Message          string            `json:"message" validate:"required,min=1"`
 	Notifiers        []string          `json:"notifiers" validate:"required,min=1"`

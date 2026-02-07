@@ -101,7 +101,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 		}
 	}
 
-	if sw.DeleteAfterSent {
+	if *sw.DeleteAfterSent {
 		w.Logger.Debug("Auto-deleting switch after sending", "id", *sw.Id)
 		err = w.Store.Delete(*sw.Id)
 		if err != nil {

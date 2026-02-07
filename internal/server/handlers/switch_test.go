@@ -55,7 +55,7 @@ func TestPostHandleFunc(t *testing.T) {
 			Message:         "Secret Message",
 			Notifiers:       []string{"logger://", "discord://token@id"},
 			CheckInInterval: "24h",
-			DeleteAfterSent: true,
+			DeleteAfterSent: ptr(true),
 		}
 		body, err := json.Marshal(payload)
 		if err != nil {
@@ -288,7 +288,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Original Message",
 			Notifiers:       []string{"generic://general1"},
 			CheckInInterval: "24h",
-			DeleteAfterSent: false,
+			DeleteAfterSent: ptr(false),
 		}
 		created, err := store.Create(initial)
 		if err != nil {
@@ -300,7 +300,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Updated Message",
 			Notifiers:       []string{"generic://general2"},
 			CheckInInterval: "12h",
-			DeleteAfterSent: true,
+			DeleteAfterSent: ptr(true),
 		}
 		body, err := json.Marshal(updatedPayload)
 		if err != nil {
@@ -328,7 +328,7 @@ func TestPutSwitchId(t *testing.T) {
 		if resp.Message != updatedPayload.Message {
 			t.Errorf("expected message %s, got %s", updatedPayload.Message, resp.Message)
 		}
-		if resp.DeleteAfterSent != updatedPayload.DeleteAfterSent {
+		if *resp.DeleteAfterSent != *updatedPayload.DeleteAfterSent {
 			t.Errorf("expected deleteAfterSent %v, got %v", updatedPayload.DeleteAfterSent, resp.DeleteAfterSent)
 		}
 		if resp.CheckInInterval != updatedPayload.CheckInInterval {
@@ -341,7 +341,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Original Message",
 			Notifiers:       []string{"generic://general1"},
 			CheckInInterval: "24h",
-			DeleteAfterSent: false,
+			DeleteAfterSent: ptr(false),
 		}
 		created, err := store.Create(initial)
 		if err != nil {
@@ -353,7 +353,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Updated Message for disabled switch",
 			Notifiers:       []string{"generic://general2"},
 			CheckInInterval: "12h",
-			Disabled:        true,
+			Disabled:        ptr(true),
 		}
 		body, err := json.Marshal(updatedPayload)
 		if err != nil {
@@ -378,7 +378,7 @@ func TestPutSwitchId(t *testing.T) {
 		}
 
 		// Verify all fields updated correctly
-		if resp.Disabled != updatedPayload.Disabled {
+		if *resp.Disabled != *updatedPayload.Disabled {
 			t.Errorf("expected disabled %s, got %s", updatedPayload.Message, resp.Message)
 		}
 	})
@@ -393,7 +393,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Original Message",
 			Notifiers:       []string{"generic://general1"},
 			CheckInInterval: createInterval,
-			DeleteAfterSent: false,
+			DeleteAfterSent: ptr(false),
 		}
 		created, err := store.Create(initial)
 		if err != nil {
@@ -453,7 +453,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Original Message",
 			Notifiers:       []string{"generic://general1"},
 			CheckInInterval: "24h",
-			DeleteAfterSent: false,
+			DeleteAfterSent: ptr(false),
 		}
 		created, err := store.Create(initial)
 		if err != nil {
@@ -465,7 +465,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Updated Message for disabled switch",
 			Notifiers:       []string{"generic://general2"},
 			CheckInInterval: "12h",
-			Encrypted:       true,
+			Encrypted:       ptr(true),
 		}
 		body, err := json.Marshal(updatedPayload)
 		if err != nil {
@@ -501,7 +501,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Original Message",
 			Notifiers:       []string{"generic://general1"},
 			CheckInInterval: "24h",
-			DeleteAfterSent: false,
+			DeleteAfterSent: ptr(false),
 		}
 
 		body, _ := json.Marshal(initial)
@@ -630,7 +630,7 @@ func TestResetHandleFunc(t *testing.T) {
 			Message:         "Reset Me",
 			Notifiers:       []string{"logger://"},
 			CheckInInterval: "1h",
-			Disabled:        true,
+			Disabled:        ptr(true),
 		})
 		if err != nil {
 			t.Fatalf("failed to seed switch: %v", err)
@@ -653,7 +653,7 @@ func TestResetHandleFunc(t *testing.T) {
 		}
 
 		// Verify not disabled
-		if resp.Disabled {
+		if *resp.Disabled {
 			t.Error("expected disabled to be false after reset")
 		}
 	})
@@ -691,7 +691,7 @@ func TestDisableHandleFunc(t *testing.T) {
 		}
 
 		// Verify disabled status is now true
-		if !resp.Disabled {
+		if !*resp.Disabled {
 			t.Error("expected switch to be disabled in response")
 		}
 
@@ -701,7 +701,7 @@ func TestDisableHandleFunc(t *testing.T) {
 			t.Fatalf("failed to get switch by id: %v", err)
 		}
 
-		if !dbSwitch.Disabled {
+		if !*dbSwitch.Disabled {
 			t.Error("expected switch to be disabled in database")
 		}
 	})

@@ -239,9 +239,6 @@ components:
       type: object
       required:
         - checkInInterval
-        - deleteAfterSent
-        - disabled
-        - encrypted
         - message
         - notifiers
         - sendAt
@@ -273,8 +270,8 @@ components:
           items:
             type: string
           example:
-            - "slack://tokena/tokenb/tokenc"
-            - "discord://token@id"
+            - slack://tokena/tokenb/tokenc
+            - discord://webhookid@token
           x-oapi-codegen-extra-tags:
             validate: "required,min=1"
         pushSubscription:

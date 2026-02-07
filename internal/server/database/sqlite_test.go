@@ -29,7 +29,7 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 		Message:         "Test Message",
 		Notifiers:       []string{"logger://"},
 		CheckInInterval: "1h",
-		DeleteAfterSent: false,
+		DeleteAfterSent: ptr(false),
 		SendAt:          &oneHourLater,
 	}
 
@@ -80,7 +80,7 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 			Message:         msg,
 			Notifiers:       []string{"n1"},
 			CheckInInterval: "1h",
-			Encrypted:       true,
+			Encrypted:       ptr(true),
 			SendAt:          &oneHourLater,
 		}
 
@@ -189,7 +189,7 @@ func TestSQLiteStore_StatusAndExpirations(t *testing.T) {
 			Message:         plaintextMsg,
 			Notifiers:       []string{notifierURL},
 			CheckInInterval: "1ms",
-			Encrypted:       true,
+			Encrypted:       ptr(true),
 			PushSubscription: &api.PushSubscription{
 				Endpoint: ptr(pushEndpoint),
 			},
@@ -242,7 +242,7 @@ func TestSQLiteStore_SwitchCryptoHelpers(t *testing.T) {
 			Message:          plaintextMsg,
 			Notifiers:        notifiers,
 			PushSubscription: push,
-			Encrypted:        true,
+			Encrypted:        ptr(true),
 		}
 
 		// 1. Encrypt
