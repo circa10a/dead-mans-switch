@@ -2,6 +2,10 @@ package database
 
 import "github.com/circa10a/dead-mans-switch/api"
 
+const (
+	secretName = "switches_encryption.key"
+)
+
 // Store defines the behaviors required for persisting and managing dead man switches.
 type Store interface {
 	// Init executes the initial schema setup.
@@ -21,13 +25,13 @@ type Store interface {
 	// Delete removes a switch record from the store.
 	Delete(id int) error
 	// Reset updates the send_at time for a switch based on its check-in interval.
-	Reset(id int) error
+	Reset(id int) (api.Switch, error)
 	// Disable disables a switch to it will not be monitored.
-	Disable(id int) error
+	Disable(id int) (api.Switch, error)
 	// ReminderSent flags a switch so the PWA reminder isn't sent repeatedly in the same cycle.
-	ReminderSent(id int) error
+	ReminderSent(id int) (api.Switch, error)
 	// Sent marks a specific switch as having been processed/sent.
-	Sent(id int) error
+	Sent(id int) (api.Switch, error)
 	// Encrypt encrypts sensitive content.
 	EncryptSwitch(*api.Switch) error
 	// Decrypt encrypts sensitive content.

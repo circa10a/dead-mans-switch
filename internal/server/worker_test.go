@@ -46,16 +46,16 @@ func (m *MockStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
 	return nil, nil
 }
 
-func (m *MockStore) ReminderSent(id int) error {
+func (m *MockStore) ReminderSent(id int) (api.Switch, error) {
 	m.MarkReminderSentCalled = true
 	if m.MarkReminderSentFunc != nil {
-		return m.MarkReminderSentFunc(id)
+		return api.Switch{}, m.MarkReminderSentFunc(id)
 	}
-	return nil
+	return api.Switch{}, nil
 }
-func (m *MockStore) Sent(id int) error {
+func (m *MockStore) Sent(id int) (api.Switch, error) {
 	m.SentCalled = true
-	return m.SentFunc(id)
+	return api.Switch{}, m.SentFunc(id)
 }
 func (m *MockStore) Update(id int, sw api.Switch) (api.Switch, error) {
 	return sw, nil
@@ -64,11 +64,11 @@ func (m *MockStore) Delete(id int) error {
 	m.DeletedCalled = true
 	return m.DeleteFunc(id)
 }
-func (m *MockStore) Reset(id int) error {
-	return nil
+func (m *MockStore) Reset(id int) (api.Switch, error) {
+	return api.Switch{}, nil
 }
-func (m *MockStore) Disable(id int) error {
-	return nil
+func (m *MockStore) Disable(id int) (api.Switch, error) {
+	return api.Switch{}, nil
 }
 func (m *MockStore) EncryptSwitch(*api.Switch) error {
 	return nil

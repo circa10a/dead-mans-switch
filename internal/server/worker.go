@@ -111,7 +111,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 	}
 
 	w.Logger.Debug("Marking switch as sent", "id", *sw.Id)
-	err = w.Store.Sent(*sw.Id)
+	_, err = w.Store.Sent(*sw.Id)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,8 @@ func (w *Worker) processReminder(sw api.Switch) error {
 		}
 
 		w.Logger.Debug("Marking reminder as sent in database", "id", *sw.Id)
-		return w.Store.ReminderSent(*sw.Id)
+		_, reminderSentErr := w.Store.ReminderSent(*sw.Id)
+		return reminderSentErr
 	}
 
 	return nil

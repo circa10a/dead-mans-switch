@@ -24,8 +24,7 @@ import (
 )
 
 const (
-	dbName     = "switches.db"
-	secretName = "switches_encryption.key"
+	sqliteDBName = "switches_sqlite.db"
 	// switchColumns centralizes the field list to prevent Scan errors
 	switchColumns = `id, message, notifiers, send_at, sent, check_in_interval, delete_after_sent, disabled, encrypted, push_subscription, reminder_threshold, reminder_sent`
 )
@@ -37,8 +36,8 @@ type SQLiteStore struct {
 }
 
 // New initializes a new SQLiteStore with optional encryption support.
-func New(dbPath string) (Store, error) {
-	db, err := connect(dbPath)
+func NewSQLiteStore(dbPath string) (Store, error) {
+	db, err := sqliteConnect(dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -300,17 +299,17 @@ func (s *SQLiteStore) Delete(id int) error {
 }
 
 // Reset resets the send_at time based on the switch's check-in interval and clears the reminder_sent/sent status.
-func (s *SQLiteStore) Reset(id int) error {
+func (s *SQLiteStore) Reset(id int) (api.Switch, error) {
 	intervalStr := ""
 
 	err := s.db.QueryRow("SELECT check_in_interval FROM switches WHERE id = ?", id).Scan(&intervalStr)
 	if err != nil {
-		return err
+		return api.Switch{}, err
 	}
 
 	duration, err := time.ParseDuration(intervalStr)
 	if err != nil {
-		return fmt.Errorf("invalid duration format: %w", err)
+		return api.Switch{}, fmt.Errorf("invalid duration format: %w", err)
 	}
 
 	newSendAt := time.Now().UTC().Add(duration).Unix()
@@ -318,51 +317,59 @@ func (s *SQLiteStore) Reset(id int) error {
 
 	result, err := s.db.Exec(updateQuery, newSendAt, id)
 	if err != nil {
-		return err
+		return api.Switch{}, err
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return api.Switch{}, err
 	}
 
 	if rows == 0 {
-		return sql.ErrNoRows
+		return api.Switch{}, sql.ErrNoRows
 	}
 
-	return nil
+	return s.GetByID(id)
 }
 
 // Disable sets the disabled status of a switch to true.
-func (s *SQLiteStore) Disable(id int) error {
+func (s *SQLiteStore) Disable(id int) (api.Switch, error) {
 	query := `UPDATE switches SET disabled = 1 WHERE id = ?`
 	result, err := s.db.Exec(query, id)
 	if err != nil {
-		return fmt.Errorf("failed to disable switch: %w", err)
+		return api.Switch{}, fmt.Errorf("failed to disable switch: %w", err)
 	}
 
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return api.Switch{}, err
 	}
 
 	if rows == 0 {
-		return sql.ErrNoRows
+		return api.Switch{}, sql.ErrNoRows
 	}
 
-	return nil
+	return s.GetByID(id)
 }
 
 // ReminderSent marks the reminder on the switch with the given ID as sent.
-func (s *SQLiteStore) ReminderSent(id int) error {
+func (s *SQLiteStore) ReminderSent(id int) (api.Switch, error) {
 	_, err := s.db.Exec(`UPDATE switches SET reminder_sent = 1 WHERE id = ?`, id)
-	return err
+	if err != nil {
+		return api.Switch{}, fmt.Errorf("failed to mark reminder as sent: %w", err)
+	}
+
+	return s.GetByID(id)
 }
 
 // Sent marks the switch with the given ID as sent.
-func (s *SQLiteStore) Sent(id int) error {
+func (s *SQLiteStore) Sent(id int) (api.Switch, error) {
 	_, err := s.db.Exec(`UPDATE switches SET sent = ? WHERE id = ?`, true, id)
-	return err
+	if err != nil {
+		return api.Switch{}, fmt.Errorf("failed to mark switch as sent: %w", err)
+	}
+
+	return s.GetByID(id)
 }
 
 // Close closes the connection to the SQLite database.
@@ -586,13 +593,13 @@ func (s *SQLiteStore) decrypt(cryptoText string) ([]byte, error) {
 }
 
 // connect is an internal helper that sets up the database connection and directory.
-func connect(dbPath string) (*sql.DB, error) {
+func sqliteConnect(dbPath string) (*sql.DB, error) {
 	err := os.MkdirAll(dbPath, 0750)
 	if err != nil {
 		return nil, err
 	}
 
-	fullPath := filepath.Join(dbPath, dbName)
+	fullPath := filepath.Join(dbPath, sqliteDBName)
 	params := url.Values{}
 	params.Add("_pragma", "journal_mode=WAL")
 	params.Add("_pragma", "synchronous=NORMAL")

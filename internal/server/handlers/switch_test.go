@@ -25,7 +25,7 @@ import (
 func setupTestHandler(t *testing.T) (*Switch, database.Store) {
 	t.Helper()
 
-	store, err := database.New(t.TempDir())
+	store, err := database.NewSQLiteStore(t.TempDir())
 	if err != nil {
 		t.Fatalf("failed to create test db: %v", err)
 	}
@@ -184,8 +184,17 @@ func TestGetHandleFunc(t *testing.T) {
 	}
 
 	// Mark two as sent
-	_ = store.Sent(*s2.Id)
-	_ = store.Sent(*s3.Id)
+	sentSwitch2, err := store.Sent(*s2.Id)
+	if err != nil {
+		t.Fatalf("failed to update switch as sent: %v", err)
+	}
+	if !*sentSwitch2.Sent {
+		t.Errorf("failed to mark switch as sent: %v", err)
+	}
+	sentSwitch3, err := store.Sent(*s3.Id)
+	if !*sentSwitch3.Sent {
+		t.Errorf("failed to mark switch as sent: %v", err)
+	}
 
 	t.Run("returns all switches with messages", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/switch", nil)
@@ -539,8 +548,8 @@ func TestDeleteHandleFunc(t *testing.T) {
 		r.Delete("/api/v1/switch/{id}", s.DeleteHandleFunc)
 		r.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Errorf("expected 200, got %d", rec.Code)
+		if rec.Code != http.StatusNoContent {
+			t.Errorf("expected 204, got %d", rec.Code)
 		}
 
 		// Verify it's gone from the DB
@@ -577,9 +586,13 @@ func TestResetHandleFunc(t *testing.T) {
 		t.Fatalf("failed to seed switch: %v", err)
 	}
 
-	err = store.Sent(*sw.Id)
+	sentSwitch, err := store.Sent(*sw.Id)
 	if err != nil {
-		t.Fatalf("failed to mark switch as sent: %v", err)
+		t.Errorf("failed to mark switch as sent: %v", err)
+	}
+
+	if !*sentSwitch.Sent {
+		t.Error("expected switch to be marked as sent but wasn't")
 	}
 
 	t.Run("successfully resets a switch timer and sent status", func(t *testing.T) {

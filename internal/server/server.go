@@ -118,7 +118,7 @@ func New(cfg *Config) (*Server, error) {
 	server.logger = slog.New(logHandler)
 
 	// Database
-	db, err := database.New(server.StorageDir)
+	db, err := database.NewSQLiteStore(server.StorageDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
@@ -207,6 +207,7 @@ func New(cfg *Config) (*Server, error) {
 		// VAPID key for push notifications
 		r.Get("/vapid", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(server.VAPIDPublicKey))
 		})
 	})

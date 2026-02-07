@@ -118,6 +118,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     put:
       summary: Update an existing dead man switch
       parameters:
@@ -151,6 +157,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       summary: Delete a dead man switch
       parameters:
@@ -160,14 +172,16 @@ paths:
           schema:
             type: integer
       responses:
-        '200':
+        '204':
           description: Switch successfully deleted
+        '404':
+          description: Switch not found
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Switch'
-        '404':
-          description: Switch not found
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:
@@ -194,6 +208,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /switch/{id}/disable:
     post:
       summary: Disable the dead man switch
@@ -212,6 +232,12 @@ paths:
                 $ref: '#/components/schemas/Switch'
         '404':
           description: Switch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
           content:
             application/json:
               schema:

@@ -11,7 +11,7 @@ import (
 func setupTestStore(t *testing.T) Store {
 	t.Helper()
 	dbPath := t.TempDir()
-	store, err := New(dbPath)
+	store, err := NewSQLiteStore(dbPath)
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
@@ -159,7 +159,7 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 			t.Error("created switch was not found in eligible reminders list")
 		}
 
-		err = store.ReminderSent(*created.Id)
+		_, err = store.ReminderSent(*created.Id)
 		if err != nil {
 			t.Fatalf("failed to mark reminder sent: %v", err)
 		}

@@ -17,13 +17,12 @@ import (
 
 // Error messages
 const (
-	errInvalidSwitchID      = "Invalid switch ID"
-	errLimitValue           = "Invalid limit value"
-	errSwitchNotFound       = "Switch not found"
-	errDatabaseError        = "Database error"
-	errFailedToDelete       = "Failed to delete switch"
-	errFailedToReset        = "Failed to reset switch"
-	errFailedToFetchUpdated = "Error fetching updated switch"
+	errInvalidSwitchID = "Invalid switch ID"
+	errLimitValue      = "Invalid limit value"
+	errSwitchNotFound  = "Switch not found"
+	errDatabaseError   = "Database error"
+	errFailedToDelete  = "Failed to delete switch"
+	errFailedToReset   = "Failed to reset switch"
 )
 
 // Send all unless specified.
@@ -184,7 +183,7 @@ func (s *Switch) DeleteHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target, err := s.Store.GetByID(id)
+	_, err = s.Store.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
@@ -194,13 +193,13 @@ func (s *Switch) DeleteHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.Store.Delete(id); err != nil {
+	err = s.Store.Delete(id)
+	if err != nil {
 		s.sendError(w, http.StatusInternalServerError, errFailedToDelete, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(s.redact(target))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ResetHandleFunc resets the dead man switch timer.
@@ -221,16 +220,24 @@ func (s *Switch) ResetHandleFunc(w http.ResponseWriter, r *http.Request) {
 	// If a subscription was provided, update it in the database
 	if req.PushSubscription != nil {
 		existing, err := s.Store.GetByID(id)
-		if err == nil {
-			existing.PushSubscription = req.PushSubscription
-			_, err = s.Store.Update(id, existing)
-			if err != nil {
-				s.Logger.Warn("failed to update push subscription during reset", "id", id, "error", err)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
+				return
 			}
+			s.sendError(w, http.StatusInternalServerError, errFailedToReset, err)
+			return
+		}
+
+		existing.PushSubscription = req.PushSubscription
+		_, err = s.Store.Update(id, existing)
+		if err != nil {
+			s.Logger.Warn("failed to update push subscription during reset", "id", id, "error", err)
 		}
 	}
 
-	if err = s.Store.Reset(id); err != nil {
+	resetSwitch, err := s.Store.Reset(id)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
 			return
@@ -239,14 +246,8 @@ func (s *Switch) ResetHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updatedSwitch, err := s.Store.GetByID(id)
-	if err != nil {
-		s.sendError(w, http.StatusInternalServerError, errFailedToFetchUpdated, err)
-		return
-	}
-
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(s.redact(updatedSwitch))
+	_ = json.NewEncoder(w).Encode(s.redact(resetSwitch))
 }
 
 // DisableHandleFunc marks a switch as disabled.
@@ -257,19 +258,13 @@ func (s *Switch) DisableHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = s.Store.Disable(id)
+	disabledSwitch, err := s.Store.Disable(id)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, "switch not found", err)
 			return
 		}
 		s.sendError(w, http.StatusInternalServerError, "failed to disable switch", err)
-		return
-	}
-
-	disabledSwitch, err := s.Store.GetByID(id)
-	if err != nil {
-		s.sendError(w, http.StatusInternalServerError, errFailedToFetchUpdated, err)
 		return
 	}
 
