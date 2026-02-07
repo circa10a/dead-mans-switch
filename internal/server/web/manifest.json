@@ -1,11 +1,11 @@
 {
   "short_name": "Dead Man's Switch",
   "name": "Dead Man's Switch",
-  "id": "dead-mans-switch-local",
+  "id": "dead-mans-switch",
   "description": "Safety monitoring and automated notification system.",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/15151/15151343.png",
+      "src": "https://i.imgur.com/E52M9LY.png",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "any maskable"
