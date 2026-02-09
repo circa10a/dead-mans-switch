@@ -110,6 +110,7 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 			Message:           "Reminder Test",
 			Notifiers:         []string{"logger://"},
 			CheckInInterval:   "1h",
+			ReminderEnabled:   ptr(true),
 			ReminderThreshold: ptr("15m"),
 			SendAt:            &oneHourLater,
 		}
@@ -134,6 +135,7 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 			Message:           "Eligible",
 			Notifiers:         []string{"logger://"},
 			CheckInInterval:   "1h",
+			ReminderEnabled:   ptr(true),
 			ReminderThreshold: ptr("10m"),
 			SendAt:            &oneSecondAgo, // Expired
 		}

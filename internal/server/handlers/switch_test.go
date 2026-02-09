@@ -152,6 +152,141 @@ func TestPostHandleFunc(t *testing.T) {
 			t.Errorf("Expected encrypted string, but found a URL scheme in: %s", returnedNotifier)
 		}
 	})
+
+	t.Run("create new switch with push subscription and reminder threshold sets reminderEnabled", func(t *testing.T) {
+		payload := api.Switch{
+			Message:           "Original Message",
+			Notifiers:         []string{"generic://general1"},
+			CheckInInterval:   "24h",
+			PushSubscription:  &api.PushSubscription{},
+			ReminderThreshold: ptr("5m"),
+		}
+		body, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal switch: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/switch", bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		handlerToTest.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		resp := api.Switch{}
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		// Verify reminderEnabled
+		if resp.ReminderEnabled == nil || !*resp.ReminderEnabled {
+			t.Error("expected reminderEnable to be set to true but wasn't")
+		}
+	})
+
+	t.Run("create new switch with push subscription and no reminder threshold doesn't set reminderEnabled", func(t *testing.T) {
+		payload := api.Switch{
+			Message:          "Original Message",
+			Notifiers:        []string{"generic://general1"},
+			CheckInInterval:  "24h",
+			PushSubscription: &api.PushSubscription{},
+		}
+		body, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal switch: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/switch", bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		handlerToTest.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		resp := api.Switch{}
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		// Verify reminderEnabled
+		if resp.ReminderEnabled != nil && *resp.ReminderEnabled {
+			t.Error("expected reminderEnable to be set to false but was true")
+		}
+	})
+
+	t.Run("create new switch without push subscription and reminder threshold doesn't set reminderEnabled", func(t *testing.T) {
+		payload := api.Switch{
+			Message:           "Original Message",
+			Notifiers:         []string{"generic://general1"},
+			CheckInInterval:   "24h",
+			PushSubscription:  nil,
+			ReminderThreshold: ptr("5m"),
+		}
+		body, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal switch: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/switch", bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		handlerToTest.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		resp := api.Switch{}
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		// Verify reminderEnabled
+		if resp.ReminderEnabled != nil && *resp.ReminderEnabled {
+			t.Error("expected reminderEnable to be set to false but was true")
+		}
+	})
+
+	t.Run("create new switch with push subscription and reminder threshold empty string sets reminderEnabled to false", func(t *testing.T) {
+		payload := api.Switch{
+			Message:           "Original Message",
+			Notifiers:         []string{"generic://general1"},
+			CheckInInterval:   "24h",
+			PushSubscription:  &api.PushSubscription{},
+			ReminderThreshold: ptr(""),
+		}
+		body, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("failed to unmarshal switch: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/switch", bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		handlerToTest.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d. Body: %s", rec.Code, rec.Body.String())
+		}
+
+		resp := api.Switch{}
+		err = json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+
+		// Verify reminderEnabled
+		if resp.ReminderEnabled != nil && *resp.ReminderEnabled {
+			t.Error("expected reminderEnable to be set to false but was true")
+		}
+	})
 }
 
 func TestGetHandleFunc(t *testing.T) {
@@ -502,7 +637,6 @@ func TestPutSwitchId(t *testing.T) {
 		if resp.Message == updatedPayload.Message {
 			t.Errorf("expected message to be encrypted, but got plaintext %s, got %s", updatedPayload.Message, resp.Message)
 		}
-
 	})
 
 	t.Run("returns 404 for non-existent switch", func(t *testing.T) {
@@ -523,6 +657,133 @@ func TestPutSwitchId(t *testing.T) {
 
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("expected 404, got %d", rec.Code)
+		}
+	})
+
+	t.Run("update switch with push subscription and reminder threshold sets reminderEnabled", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Initial",
+			Notifiers:       []string{"logger://"},
+			CheckInInterval: "24h",
+		}
+		created, _ := store.Create(initial)
+
+		payload := api.Switch{
+			Message:           "Updated with Reminders",
+			Notifiers:         []string{"logger://"},
+			CheckInInterval:   "24h",
+			PushSubscription:  &api.PushSubscription{},
+			ReminderThreshold: ptr("10m"),
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/switch/%d", *created.Id), bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		r := chi.NewRouter()
+		r.With(mw).Put("/api/v1/switch/{id}", s.PutByIDHandleFunc)
+		r.ServeHTTP(rec, req)
+
+		resp := api.Switch{}
+		_ = json.NewDecoder(rec.Body).Decode(&resp)
+
+		if resp.ReminderEnabled == nil || !*resp.ReminderEnabled {
+			t.Error("expected reminderEnabled to be set to true during update but wasn't")
+		}
+	})
+
+	t.Run("update switch with push subscription and no reminder threshold doesn't set reminderEnabled", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Initial",
+			Notifiers:       []string{"logger://"},
+			CheckInInterval: "24h",
+		}
+		created, _ := store.Create(initial)
+
+		payload := api.Switch{
+			Message:          "Updated with Push Only",
+			Notifiers:        []string{"logger://"},
+			CheckInInterval:  "24h",
+			PushSubscription: &api.PushSubscription{},
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/switch/%d", *created.Id), bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		r := chi.NewRouter()
+		r.With(mw).Put("/api/v1/switch/{id}", s.PutByIDHandleFunc)
+		r.ServeHTTP(rec, req)
+
+		resp := api.Switch{}
+		_ = json.NewDecoder(rec.Body).Decode(&resp)
+
+		if resp.ReminderEnabled != nil && *resp.ReminderEnabled {
+			t.Error("expected reminderEnabled to be false when threshold is missing in update")
+		}
+	})
+
+	t.Run("update switch without push subscription and reminder threshold doesn't set reminderEnabled", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Initial",
+			Notifiers:       []string{"logger://"},
+			CheckInInterval: "24h",
+		}
+		created, _ := store.Create(initial)
+
+		payload := api.Switch{
+			Message:           "Updated with Threshold Only",
+			Notifiers:         []string{"logger://"},
+			CheckInInterval:   "24h",
+			PushSubscription:  nil,
+			ReminderThreshold: ptr("15m"),
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/switch/%d", *created.Id), bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		r := chi.NewRouter()
+		r.With(mw).Put("/api/v1/switch/{id}", s.PutByIDHandleFunc)
+		r.ServeHTTP(rec, req)
+
+		resp := api.Switch{}
+		_ = json.NewDecoder(rec.Body).Decode(&resp)
+
+		if resp.ReminderEnabled != nil && *resp.ReminderEnabled {
+			t.Error("expected reminderEnabled to be false when push subscription is missing in update")
+		}
+	})
+
+	t.Run("update switch with push subscription and reminder threshold empty string sets reminderEnabled to false", func(t *testing.T) {
+		initial := api.Switch{
+			Message:         "Initial",
+			Notifiers:       []string{"logger://"},
+			CheckInInterval: "24h",
+		}
+		created, _ := store.Create(initial)
+
+		payload := api.Switch{
+			Message:           "Updated with Threshold Only",
+			Notifiers:         []string{"logger://"},
+			CheckInInterval:   "24h",
+			PushSubscription:  &api.PushSubscription{},
+			ReminderThreshold: ptr(""),
+		}
+		body, _ := json.Marshal(payload)
+
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/switch/%d", *created.Id), bytes.NewBuffer(body))
+		rec := httptest.NewRecorder()
+
+		r := chi.NewRouter()
+		r.With(mw).Put("/api/v1/switch/{id}", s.PutByIDHandleFunc)
+		r.ServeHTTP(rec, req)
+
+		resp := api.Switch{}
+		_ = json.NewDecoder(rec.Body).Decode(&resp)
+
+		if resp.ReminderEnabled != nil && *resp.ReminderEnabled {
+			t.Error("expected reminderEnabled to be false when push subscription is not empty and reminderInterval is empty in update")
 		}
 	})
 }
@@ -575,28 +836,32 @@ func TestDeleteHandleFunc(t *testing.T) {
 
 func TestResetHandleFunc(t *testing.T) {
 	s, store := setupTestHandler(t)
+	checkInInterval := "12h"
+	expectedInterval := 12 * time.Hour
 
-	// Create a switch that was already "sent" to test if reset clears it
 	sw, err := store.Create(api.Switch{
 		Message:         "Reset Me",
 		Notifiers:       []string{"logger://"},
-		CheckInInterval: "1h",
+		CheckInInterval: checkInInterval,
 	})
 	if err != nil {
 		t.Fatalf("failed to seed switch: %v", err)
 	}
 
-	sentSwitch, err := store.Sent(*sw.Id)
+	_, err = s.Store.Sent(*sw.Id)
 	if err != nil {
-		t.Errorf("failed to mark switch as sent: %v", err)
+		t.Fatalf("failed to marks switch as sent: %v", err)
 	}
 
-	if !*sentSwitch.Sent {
-		t.Error("expected switch to be marked as sent but wasn't")
-	}
+	t.Run("successfully resets a switch timer and statuses", func(t *testing.T) {
+		// Calculate the expected Unix timestamp based on Now
+		now := time.Now().Unix()
+		expectedSendAt := now + int64(expectedInterval.Seconds())
 
-	t.Run("successfully resets a switch timer and sent status", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/switch/1/reset", nil)
+		// Allow for a small window of time (e.g., 5 seconds) due to processing delay
+		delta := int64(5)
+
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/v1/switch/%d/reset", *sw.Id), nil)
 		rec := httptest.NewRecorder()
 
 		r := chi.NewRouter()
@@ -613,15 +878,24 @@ func TestResetHandleFunc(t *testing.T) {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		// Verify sent status is now false
-		if resp.Sent != nil && *resp.Sent {
-			t.Error("expected switch to be unsent after reset")
+		// Verify reminderSent status is now false
+		if resp.Disabled != nil && *resp.Disabled {
+			t.Error("expected disabled to be false after reset")
 		}
 
-		// Verify sendAt is in the future
-		sendAtTime := time.Unix(*resp.SendAt, 0)
-		if !sendAtTime.After(time.Now()) {
-			t.Error("expected sendAt to be reset to a future time")
+		// Verify reminderSent status is now false
+		if resp.Sent != nil && *resp.ReminderSent {
+			t.Error("expected reminderSent to be false after reset")
+		}
+
+		// Verify sent status is now false
+		if resp.Sent != nil && *resp.Sent {
+			t.Error("expected switch to be false after reset")
+		}
+
+		if *resp.SendAt < (expectedSendAt-delta) || *resp.SendAt > (expectedSendAt+delta) {
+			t.Errorf("expected SendAt to be approx %d (12h from now), but got %d (diff: %ds)",
+				expectedSendAt, *resp.SendAt, *resp.SendAt-expectedSendAt)
 		}
 	})
 
@@ -638,12 +912,14 @@ func TestResetHandleFunc(t *testing.T) {
 		}
 	})
 
-	t.Run("reset enables a disabled switch", func(t *testing.T) {
+	t.Run("reset enables a disabled/sent switch", func(t *testing.T) {
 		disabledSw, err := store.Create(api.Switch{
 			Message:         "Reset Me",
 			Notifiers:       []string{"logger://"},
 			CheckInInterval: "1h",
 			Disabled:        ptr(true),
+			ReminderSent:    ptr(true),
+			Sent:            ptr(true),
 		})
 		if err != nil {
 			t.Fatalf("failed to seed switch: %v", err)
@@ -665,9 +941,19 @@ func TestResetHandleFunc(t *testing.T) {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		// Verify not disabled
+		// Verify not Disabled
 		if *resp.Disabled {
 			t.Error("expected disabled to be false after reset")
+		}
+
+		// Verify no ReminderSent
+		if *resp.ReminderSent {
+			t.Error("expected reminderSent to be false after reset")
+		}
+
+		// Verify not Sent
+		if *resp.Sent {
+			t.Error("expected sent to be false after reset")
 		}
 	})
 }
@@ -736,7 +1022,7 @@ func TestDisableHandleFunc(t *testing.T) {
 func TestSwitch_Redact(t *testing.T) {
 	s := &Switch{}
 
-	t.Run("Replaces populated subscription with empty object", func(t *testing.T) {
+	t.Run("Nullifies push subscription", func(t *testing.T) {
 		endpoint := "https://fcm.googleapis.com/test"
 		sw := api.Switch{
 			PushSubscription: &api.PushSubscription{
@@ -747,17 +1033,8 @@ func TestSwitch_Redact(t *testing.T) {
 		redacted := s.redact(sw)
 
 		// Verify object exists (signals UI to show the bell)
-		if redacted.PushSubscription == nil {
-			t.Fatal("expected PushSubscription to be non-nil")
-		}
-
-		// Verify all internal fields are nil (redacted)
-		if redacted.PushSubscription.Endpoint != nil {
-			t.Error("expected Endpoint to be nil")
-		}
-
-		if redacted.PushSubscription.Keys != nil {
-			t.Error("expected Keys to be nil")
+		if redacted.PushSubscription != nil {
+			t.Fatal("expected PushSubscription to be nil")
 		}
 	})
 
@@ -785,13 +1062,10 @@ func TestSwitch_RedactAll(t *testing.T) {
 			t.Fatalf("expected 2 switches, got %d", len(redactedList))
 		}
 
-		// First switch: should have an empty object (not nil, but no endpoint)
-		if redactedList[0].PushSubscription == nil {
-			t.Error("first switch: expected PushSubscription object to exist for UI signaling")
-		} else if redactedList[0].PushSubscription.Endpoint != nil {
-			t.Error("first switch: expected endpoint to be nil (redacted)")
+		// First switch: should be nil
+		if redactedList[0].PushSubscription != nil {
+			t.Error("first switch: expected PushSubscription to be nil")
 		}
-
 		// Second switch: should stay nil
 		if redactedList[1].PushSubscription != nil {
 			t.Error("second switch: expected PushSubscription to remain nil")

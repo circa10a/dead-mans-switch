@@ -26,7 +26,7 @@ import (
 const (
 	sqliteDBName = "switches_sqlite.db"
 	// switchColumns centralizes the field list to prevent Scan errors
-	switchColumns = `id, message, notifiers, send_at, sent, check_in_interval, delete_after_sent, disabled, encrypted, push_subscription, reminder_threshold, reminder_sent`
+	switchColumns = `id, message, notifiers, send_at, sent, check_in_interval, delete_after_sent, disabled, encrypted, push_subscription, reminder_enabled, reminder_threshold, reminder_sent`
 )
 
 // SQLiteStore is an implementation of the Store interface for SQLite.
@@ -108,8 +108,8 @@ func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
 		}
 	}
 
-	query := `INSERT INTO switches (message, notifiers, send_at, sent, check_in_interval, delete_after_sent, disabled, encrypted, push_subscription, reminder_threshold, reminder_sent)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO switches (message, notifiers, send_at, sent, check_in_interval, delete_after_sent, disabled, encrypted, push_subscription, reminder_enabled, reminder_threshold, reminder_sent)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	res, err := s.db.Exec(query,
 		sw.Message,
@@ -121,6 +121,7 @@ func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
 		sw.Disabled != nil && *sw.Disabled,
 		sw.Encrypted != nil && *sw.Encrypted,
 		pushSubscription,
+		sw.ReminderEnabled != nil && *sw.ReminderEnabled,
 		sw.ReminderThreshold,
 		false, // ReminderSent default to false
 	)
@@ -199,7 +200,7 @@ func (s *SQLiteStore) GetExpired(limit int) ([]api.Switch, error) {
 // GetEligibleReminders finds switches that are approaching expiry, but haven't been warned yet.
 // Switch data will be decrypted so that can be sent appropriately.
 func (s *SQLiteStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
-	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE sent = 0 AND reminder_sent = 0 AND disabled = 0 AND reminder_threshold IS NOT NULL LIMIT ?", switchColumns), limit)
+	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE sent = 0 AND reminder_enabled = 1 AND reminder_sent = 0 AND disabled = 0 LIMIT ?", switchColumns), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +262,7 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		}
 	}
 
-	query := `UPDATE switches SET message=?, notifiers=?, check_in_interval=?, send_at=?, disabled=?, encrypted=?, delete_after_sent=?, sent=0, push_subscription=?, reminder_threshold=?, reminder_sent=0 WHERE id=?`
+	query := `UPDATE switches SET message=?, notifiers=?, check_in_interval=?, send_at=?, disabled=?, encrypted=?, delete_after_sent=?, sent=0, push_subscription=?, reminder_enabled = ?, reminder_threshold=?, reminder_sent=0 WHERE id=?`
 
 	res, err := s.db.Exec(
 		query,
@@ -273,6 +274,7 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		sw.Encrypted != nil && *sw.Encrypted,
 		sw.DeleteAfterSent != nil && *sw.DeleteAfterSent,
 		pushSubscription,
+		sw.ReminderEnabled != nil && *sw.ReminderEnabled,
 		sw.ReminderThreshold,
 		id,
 	)
@@ -296,40 +298,6 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 func (s *SQLiteStore) Delete(id int) error {
 	_, err := s.db.Exec(`DELETE FROM switches WHERE id = ?`, id)
 	return err
-}
-
-// Reset resets the send_at time based on the switch's check-in interval and clears the reminder_sent/sent status.
-func (s *SQLiteStore) Reset(id int) (api.Switch, error) {
-	intervalStr := ""
-
-	err := s.db.QueryRow("SELECT check_in_interval FROM switches WHERE id = ?", id).Scan(&intervalStr)
-	if err != nil {
-		return api.Switch{}, err
-	}
-
-	duration, err := time.ParseDuration(intervalStr)
-	if err != nil {
-		return api.Switch{}, fmt.Errorf("invalid duration format: %w", err)
-	}
-
-	newSendAt := time.Now().UTC().Add(duration).Unix()
-	updateQuery := `UPDATE switches SET disabled = 0, send_at = ?, sent = 0, reminder_sent = 0 WHERE id = ?`
-
-	result, err := s.db.Exec(updateQuery, newSendAt, id)
-	if err != nil {
-		return api.Switch{}, err
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return api.Switch{}, err
-	}
-
-	if rows == 0 {
-		return api.Switch{}, sql.ErrNoRows
-	}
-
-	return s.GetByID(id)
 }
 
 // Disable sets the disabled status of a switch to true.
@@ -398,6 +366,7 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		var deleteAfterSent sql.NullBool
 		var disabled sql.NullBool
 		var encrypted sql.NullBool
+		var reminderEnabled sql.NullBool
 		var reminderThresholdRaw sql.NullString
 		var reminderSent sql.NullBool
 
@@ -413,6 +382,7 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 			&disabled,
 			&encrypted,
 			&pushRaw,
+			&reminderEnabled,
 			&reminderThresholdRaw,
 			&reminderSent,
 		)
@@ -429,6 +399,9 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		}
 		if encrypted.Valid {
 			sw.Encrypted = &encrypted.Bool
+		}
+		if reminderEnabled.Valid {
+			sw.ReminderEnabled = &reminderEnabled.Bool
 		}
 		if reminderThresholdRaw.Valid {
 			val := reminderThresholdRaw.String

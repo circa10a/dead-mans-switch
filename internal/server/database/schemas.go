@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS switches (
     disabled BOOLEAN DEFAULT 0,
     encrypted BOOLEAN DEFAULT 0,
     push_subscription TEXT,
+    reminder_enabled BOOLEAN DEFAULT 0,
     reminder_threshold TEXT,
     reminder_sent BOOLEAN DEFAULT 0
 );

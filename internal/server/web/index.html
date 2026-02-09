@@ -128,7 +128,7 @@
                                     x-text="sw.disabled ? 'Paused' : (sw.sent ? 'Triggered' : (isStuck(sw) ? 'Stuck' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.sendAt) ? 'Soon' : 'Active'))))">
                                 </span>
 
-                                <template x-if="isPushEnabled(sw)">
+                                <template x-if="isReminderEnabled(sw)">
                                     <div class="flex items-center justify-center text-indigo-400 animate-pulse"
                                         title="Push Notifications Enabled">
                                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -223,7 +223,7 @@
                         class="text-gray-500 text-xs font-bold uppercase">Close</button>
                 </div>
 
-                <template x-if="isPushEnabled(sw)">
+                <template x-if="isReminderEnabled(sw)">
                     <div
                         class="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
                         <div class="flex items-center gap-3">
@@ -263,7 +263,7 @@
                         </div>
                         <textarea x-model="form.notifiersStr"
                             class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-24 text-sm font-mono"
-                            placeholder="ntfy.sh/topic"></textarea>
+                            placeholder="discord://webhookId@token"></textarea>
                     </div>
 
                     <div x-show="isSecure" class="pt-4 border-t border-white/5 space-y-4">
@@ -328,6 +328,7 @@
                     notifiersStr: '',
                     deleteAfterSent: false,
                     encrypted: false,
+                    reminderEnabled: false, 
                     reminderThreshold: '',
                     reminderIndex: 0,
                     pushSubscription: null
@@ -404,8 +405,8 @@
                     this.notifyStatus = await Notification.requestPermission();
                 },
 
-                isPushEnabled(sw) {
-                    return sw.pushSubscription && sw.reminderThreshold && !sw.disabled;
+                isReminderEnabled(sw) {
+                    return sw.reminderEnabled && !sw.disabled;
                 },
 
                isStuck(sw) {
@@ -430,12 +431,12 @@
                     // deadline is Unix seconds
                     const total = (deadline * 1000) - this.now;
                     if (isNaN(total) || total <= 0) return "00:00:00";
-                    
+
                     const s = Math.floor((total / 1000) % 60), 
                         m = Math.floor((total / 60000) % 60), 
                         h = Math.floor((total / 3600000) % 24), 
                         d = Math.floor(total / 86400000);
-                        
+
                     return (d > 0 ? d + 'd ' : '') + 
                         [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
                 },
@@ -461,7 +462,16 @@
 
                 openCreateModal() {
                     this.editingId = null;
-                    this.form = { message: '', checkInInterval: '24h', notifiersStr: '', deleteAfterSent: false, encrypted: false, reminderThreshold: '', reminderIndex: 0, pushSubscription: null };
+                    this.form = {
+                        message: '',
+                        checkInInterval: '24h',
+                        notifiersStr: '',
+                        deleteAfterSent: false,
+                        encrypted: false,
+                        reminderThreshold: '',
+                        reminderIndex: 0,
+                        pushSubscription: null
+                    };
                     this.openModal = true;
                 },
 

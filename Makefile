@@ -33,14 +33,31 @@ docker:
 docker-compose:
 	@docker compose -f ./deploy/docker-compose/docker-compose.yaml up
 
-docs:
+
+# Define the Docker runner macro
+# $(1): Redocly Alias (e.g., dead-mans-switch@v1)
+# $(2): Intermediate YAML path
+# $(3): Final HTML output path
+define render_docs
 	@docker run --rm \
 	  -v $$PWD:/tmp/project \
 	  -w /tmp/project \
 	  -e NODE_NO_WARNINGS=1 \
-	  -e npm_config_loglevel=silent \
+	  -e npm_config_loglevel=error \
 	  node \
-	  npx @redocly/cli build-docs api/openapi.yaml --output internal/server/api.html
+	  sh -c "npx --yes --quiet @redocly/cli bundle $(1) --output $(2) && \
+	         npx --yes --quiet @redocly/cli build-docs $(2) --output $(3)"
+endef
+
+INTERNAL_SPEC = api/openapi.internal.gen.yaml
+EXTERNAL_SPEC = api/openapi.external.gen.yaml
+
+docs:
+	# Internal Group: /api/v1/docs/internal
+	$(call render_docs,dead-mans-switch-internal@v1,$(INTERNAL_SPEC),internal/server/docs/api.internal.html)
+
+	# External Group: /api/v1/docs/public
+	$(call render_docs,dead-mans-switch-external@v1,$(EXTERNAL_SPEC),internal/server/docs/api.public.html)
 
 k8s:
 	@tilt up --stream=true

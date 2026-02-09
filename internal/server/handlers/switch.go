@@ -18,6 +18,7 @@ import (
 // Error messages
 const (
 	errInvalidSwitchID = "Invalid switch ID"
+	errTimeParse       = "Invalid time duration"
 	errLimitValue      = "Invalid limit value"
 	errSwitchNotFound  = "Switch not found"
 	errDatabaseError   = "Database error"
@@ -46,12 +47,16 @@ func (s *Switch) PostHandleFunc(w http.ResponseWriter, r *http.Request) {
 
 	duration, err := time.ParseDuration(payload.CheckInInterval)
 	if err != nil {
-		s.sendError(w, http.StatusBadRequest, errInvalidSwitchID, err)
+		s.sendError(w, http.StatusBadRequest, errTimeParse, err)
 		return
 	}
 	// Compute time at which to send
 	sendAt := time.Now().Add(duration).Unix()
 	payload.SendAt = &sendAt
+
+	// If push subscription and threshold defined, set reminderEnabled to true
+	reminderEnabled := payload.PushSubscription != nil && payload.ReminderThreshold != nil && *payload.ReminderThreshold != ""
+	payload.ReminderEnabled = &reminderEnabled
 
 	createdSwitch, err := s.Store.Create(payload)
 	if err != nil {
@@ -159,6 +164,10 @@ func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 		payload.SendAt = &updatedSendAt
 	}
 
+	// If push subscription and threshold defined, set reminderEnabled to true
+	reminderEnabled := payload.PushSubscription != nil && payload.ReminderThreshold != nil && *payload.ReminderThreshold != ""
+	payload.ReminderEnabled = &reminderEnabled
+
 	updatedSwitch, err := s.Store.Update(id, payload)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -217,26 +226,33 @@ func (s *Switch) ResetHandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	// If a subscription was provided, update it in the database
-	if req.PushSubscription != nil {
-		existing, err := s.Store.GetByID(id)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
-				return
-			}
-			s.sendError(w, http.StatusInternalServerError, errFailedToReset, err)
+	switchToReset, err := s.Store.GetByID(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
 			return
 		}
-
-		existing.PushSubscription = req.PushSubscription
-		_, err = s.Store.Update(id, existing)
-		if err != nil {
-			s.Logger.Warn("failed to update push subscription during reset", "id", id, "error", err)
-		}
+		s.sendError(w, http.StatusInternalServerError, errDatabaseError, err)
+		return
 	}
 
-	resetSwitch, err := s.Store.Reset(id)
+	duration, err := time.ParseDuration(switchToReset.CheckInInterval)
+	if err != nil {
+		s.sendError(w, http.StatusBadRequest, errTimeParse, err)
+		return
+	}
+
+	// Update sendAt time
+	newSendAt := time.Now().UTC().Add(duration).Unix()
+	switchToReset.SendAt = &newSendAt
+
+	// Set default values to false
+	defaultOff := false
+	switchToReset.Disabled = &defaultOff
+	switchToReset.Sent = &defaultOff
+	switchToReset.ReminderSent = &defaultOff
+
+	resetSwitch, err := s.Store.Update(id, switchToReset)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
@@ -287,9 +303,7 @@ func (s *Switch) sendError(w http.ResponseWriter, code int, publicMsg string, in
 
 // redact removes sensitive push subscription details before sending to the client.
 func (s *Switch) redact(sw api.Switch) api.Switch {
-	if sw.PushSubscription != nil {
-		sw.PushSubscription = &api.PushSubscription{}
-	}
+	sw.PushSubscription = nil
 
 	return sw
 }

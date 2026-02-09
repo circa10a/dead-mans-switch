@@ -36,8 +36,11 @@ const (
 //go:embed web/*
 var webAssets embed.FS
 
-//go:embed api.html
-var apiDocs []byte
+//go:embed docs/api.internal.html
+var internalAPIDocs []byte
+
+//go:embed docs/api.public.html
+var publicAPIDocs []byte
 
 // Server is our web server that runs the network mirror.
 type Server struct {
@@ -195,7 +198,16 @@ func New(cfg *Config) (*Server, error) {
 		})
 
 		// API docs
-		r.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(apiDocs) })
+		r.Route("/docs", func(r chi.Router) {
+			r.Get("/internal", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
+				_, _ = w.Write(internalAPIDocs)
+			})
+			r.Get("/public", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html")
+				_, _ = w.Write(publicAPIDocs)
+			})
+		})
 
 		// Standard routes (No body validation needed)
 		r.Get("/switch", switchHandler.GetHandleFunc)

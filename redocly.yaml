@@ -1,0 +1,9 @@
+---
+apis:
+  dead-mans-switch-internal@v1:
+    root: api/openapi.yaml
+
+  dead-mans-switch-external@v1:
+    root: api/openapi.yaml
+    decorators:
+      remove-x-internal: on

@@ -72,22 +72,34 @@ func formatOutput(cmd *cobra.Command, data interface{}, isError bool) {
 
 // dumpResponse handles formatting success data or API error models
 func dumpResponse(cmd *cobra.Command, statusCode int, body []byte, successData interface{}) {
-	if statusCode >= 200 && statusCode < 300 && successData != nil {
-		formatOutput(cmd, successData, false)
+	// 1. Handle all successful status codes (200-299)
+	if statusCode >= 200 && statusCode < 300 {
+		if successData != nil {
+			formatOutput(cmd, successData, false)
+		} else {
+			// Success but no data (e.g., 204 No Content)
+			if useColor {
+				color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Success")
+			} else {
+				cmd.Println("Success")
+			}
+		}
 		return
 	}
 
+	// Handle Errors: Try to parse structured API error first
 	var apiErr api.Error
 	if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.Message != "" {
 		formatOutput(cmd, apiErr, true)
 		return
 	}
 
+	// Fallback: Print raw body or just the status code
 	if len(body) > 0 {
 		if useColor {
 			_, _ = color.New(color.FgRed).Fprintln(cmd.OutOrStdout(), string(body))
 		} else {
-			cmd.Println(string(body))
+			cmd.PrintErrln(string(body))
 		}
 	} else {
 		cmd.PrintErrf("Error: Received status code %d\n", statusCode)
@@ -231,7 +243,7 @@ var deleteSwitchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		dumpResponse(cmd, resp.StatusCode(), resp.Body, resp.JSON200)
+		dumpResponse(cmd, resp.StatusCode(), resp.Body, nil)
 		return nil
 	},
 }

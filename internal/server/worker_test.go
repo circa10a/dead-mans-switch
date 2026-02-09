@@ -64,9 +64,6 @@ func (m *MockStore) Delete(id int) error {
 	m.DeletedCalled = true
 	return m.DeleteFunc(id)
 }
-func (m *MockStore) Reset(id int) (api.Switch, error) {
-	return api.Switch{}, nil
-}
 func (m *MockStore) Disable(id int) (api.Switch, error) {
 	return api.Switch{}, nil
 }

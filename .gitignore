@@ -19,6 +19,9 @@ dead-mans-switch
 *.out
 results.html
 
+# API doc temp files
+api/*.gen.yaml
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
