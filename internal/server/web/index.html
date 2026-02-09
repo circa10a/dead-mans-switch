@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -14,30 +14,53 @@
     <title>Dead Man's Switch</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <style>
         [x-cloak] {
             display: none !important;
         }
 
         body {
+            background-color: #f3f4f6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .dark body {
             background-color: #0a0a0a;
         }
 
         .glass {
-            background: rgba(23, 23, 23, 0.8);
+            background: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
         }
 
+        .dark .glass {
+            background: rgba(23, 23, 23, 0.8);
+        }
+
         .disabled-card-container {
+            background: rgba(0, 0, 0, 0.03) !important;
+            border-color: rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .dark .disabled-card-container {
             background: rgba(255, 255, 255, 0.02) !important;
             border-color: rgba(255, 255, 255, 0.05) !important;
         }
 
         input[type=range]::-webkit-slider-runnable-track {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.1);
             height: 6px;
             border-radius: 3px;
+        }
+
+        .dark input[type=range]::-webkit-slider-runnable-track {
+            background: rgba(255, 255, 255, 0.1);
         }
 
         input[type=range]::-webkit-slider-thumb {
@@ -51,9 +74,17 @@
             cursor: pointer;
         }
     </style>
+    <script>
+        // Check local storage or system preference on load to avoid FOUC
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    </script>
 </head>
 
-<body class="text-gray-100 antialiased" x-data="app()">
+<body class="text-gray-900 dark:text-gray-100 antialiased" x-data="app()">
     <template x-if="!isSecure && showInsecureWarning">
         <div
             class="bg-amber-500 text-black px-4 py-2 text-[10px] font-bold uppercase tracking-widest flex justify-between items-center z-[60] relative">
@@ -76,22 +107,35 @@
         </div>
     </div>
 
-    <header class="sticky top-0 z-40 border-b border-white/5 glass">
+    <header class="sticky top-0 z-40 border-b border-gray-200 dark:border-white/5 glass transition-colors duration-300">
         <div class="max-w-3xl mx-auto px-6 h-16 flex justify-between items-center">
             <div class="flex items-center gap-3">
                 <div
                     class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                    <div class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                        <img src="/images/purple-skull-512-rounded.png" alt="App Icon" class="w-5 h-5 object-contain">
-                    </div>
+                    <img src="/images/purple-skull-512-rounded.png" alt="App Icon" class="w-5 h-5 object-contain">
                 </div>
-                <h1 class="font-medium text-lg tracking-tight">Dead Man's Switch</h1>
+                <h1 class="font-medium text-lg tracking-tight text-gray-900 dark:text-gray-100">Dead Man's Switch</h1>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3">
+                
+                <button type="button" 
+                    @click="toggleTheme()" 
+                    class="p-2 rounded-full transition-all text-gray-500 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/10 active:scale-95 flex items-center justify-center"
+                    title="Toggle Dark Mode">
+                    
+                    <svg x-show="!darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                    </svg>
+
+                    <svg x-show="darkMode" x-cloak class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                </button>
+
                 <button @click="forcePermission()" class="p-2 rounded-full transition-all active:scale-95" :class="{
-                        'text-indigo-400 bg-indigo-500/10 animate-pulse cursor-pointer': notifyStatus === 'default',
-                        'text-indigo-400 bg-indigo-500/10': notifyStatus === 'granted',
-                        'text-gray-600 bg-white/5': notifyStatus === 'denied'
+                        'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 animate-pulse cursor-pointer': notifyStatus === 'default',
+                        'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10': notifyStatus === 'granted',
+                        'text-gray-500 dark:text-gray-600 bg-black/5 dark:bg-white/5': notifyStatus === 'denied'
                     }" :title="notifyStatus === 'granted' ? 'Notifications Enabled' : 'Click to Enable Notifications'">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
@@ -99,8 +143,9 @@
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
+                
                 <button @click="openCreateModal()"
-                    class="bg-white/10 hover:bg-white/20 border border-white/10 text-white/90 px-4 py-2 rounded-full text-xs font-medium transition-all">+
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-white/10 dark:hover:bg-white/20 dark:border border-white/10 dark:text-white/90 px-4 py-2 rounded-full text-xs font-medium transition-all shadow-md dark:shadow-none">+
                     New</button>
             </div>
         </div>
@@ -109,7 +154,7 @@
     <main class="max-w-3xl mx-auto px-4 py-6 pb-32 min-h-screen">
         <div class="space-y-4">
             <template x-for="sw in switches" :key="sw.id">
-                <div class="glass border border-white/5 rounded-2xl p-5 shadow-2xl relative overflow-hidden group transition-all duration-500"
+                <div class="glass border border-gray-200 dark:border-white/5 rounded-2xl p-5 shadow-sm dark:shadow-2xl relative overflow-hidden group transition-all duration-500"
                     :class="sw.disabled ? 'disabled-card-container' : ''">
 
                     <div :class="sw.disabled ? '' : (sw.sent ? 'bg-red-500/10' : (isPending(sw) ? 'bg-amber-500/20 animate-pulse' : (isExpiringSoon(sw.sendAt) ? 'bg-orange-500/20 animate-pulse' : 'bg-emerald-500/5')))"
@@ -120,16 +165,16 @@
                             <div class="flex items-center gap-2">
                                 <span
                                     :class="sw.disabled ? 'text-gray-500 bg-gray-500/10 border-gray-500/20' : 
-                                    (sw.sent || isStuck(sw) ? 'text-red-400 bg-red-400/10 border-red-400/20' : 
-                                    (isPending(sw) ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' : 
-                                    (isExpiringSoon(sw.sendAt) ? 'text-orange-400 bg-orange-400/10 border-orange-400/20' : 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20')))"
+                                    (sw.sent || isStuck(sw) ? 'text-red-500 dark:text-red-400 bg-red-500/10 dark:bg-red-400/10 border-red-500/20 dark:border-red-400/20' : 
+                                    (isPending(sw) ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-400/10 border-amber-500/20 dark:border-amber-400/20' : 
+                                    (isExpiringSoon(sw.sendAt) ? 'text-orange-600 dark:text-orange-400 bg-orange-500/10 dark:bg-orange-400/10 border-orange-500/20 dark:border-orange-400/20' : 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-400/10 border-emerald-500/20 dark:border-emerald-400/20')))"
                                     class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border"
                                     :class="isStuck(sw) ? 'animate-pulse ring-1 ring-red-500/50' : ''"
                                     x-text="sw.disabled ? 'Paused' : (sw.sent ? 'Triggered' : (isStuck(sw) ? 'Stuck' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.sendAt) ? 'Soon' : 'Active'))))">
                                 </span>
 
                                 <template x-if="isReminderEnabled(sw)">
-                                    <div class="flex items-center justify-center text-indigo-400 animate-pulse"
+                                    <div class="flex items-center justify-center text-indigo-500 dark:text-indigo-400 animate-pulse"
                                         title="Push Notifications Enabled">
                                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                                             <path
@@ -140,7 +185,7 @@
                             </div>
                             <div class="flex gap-2">
                                 <button x-show="!sw.disabled" @click="disableSw(sw.id)"
-                                    class="p-2 text-gray-400 hover:text-amber-400 transition-colors"
+                                    class="p-2 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
                                     title="Pause Switch">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -148,14 +193,14 @@
                                     </svg>
                                 </button>
                                 <button x-show="!sw.encrypted" @click="openEditModal(sw)"
-                                    class="p-2 text-gray-400 hover:text-indigo-400 transition-colors"><svg
+                                    class="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"><svg
                                         class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path
                                             d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                             stroke-width="2" stroke-linecap="round"></path>
                                     </svg></button>
                                 <button @click="deleteSw(sw.id)"
-                                    class="p-2 text-gray-400 hover:text-red-400 transition-colors"><svg class="w-5 h-5"
+                                    class="p-2 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><svg class="w-5 h-5"
                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path
                                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
@@ -165,13 +210,13 @@
                         </div>
 
                         <div :class="sw.disabled ? 'opacity-40 grayscale' : ''">
-                            <h2 class="text-xl font-bold text-white mb-1 truncate"
+                            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1 truncate"
                                 x-text="sw.encrypted ? '••••••••' : sw.message"></h2>
 
                             <div class="flex flex-wrap gap-1.5 mb-4">
                                 <template x-for="uri in (sw.notifiers || [])" :key="uri">
                                     <span
-                                        class="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded text-[9px] font-bold uppercase tracking-wider"
+                                        class="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-bold uppercase tracking-wider"
                                         x-text="uri.includes('://') ? uri.split('://')[0] : 'Secret'">
                                     </span>
                                 </template>
@@ -180,20 +225,20 @@
                             <div class="flex justify-between items-end">
                                 <div><span
                                         class="text-[10px] text-gray-500 uppercase font-bold block">Interval</span><span
-                                        class="text-sm font-medium text-gray-300" x-text="sw.checkInInterval"></span>
+                                        class="text-sm font-medium text-gray-600 dark:text-gray-300" x-text="sw.checkInInterval"></span>
                                 </div>
                                 <div class="text-right"><span
                                         class="text-[10px] text-gray-500 uppercase font-bold">Remaining</span><span
-                                        :class="sw.disabled ? 'text-gray-500' : (sw.sent ? 'text-red-500' : (isPending(sw) ? 'text-amber-400' : (isExpiringSoon(sw.sendAt) ? 'text-orange-400' : 'text-indigo-400')))"
+                                        :class="sw.disabled ? 'text-gray-500' : (sw.sent ? 'text-red-500' : (isPending(sw) ? 'text-amber-500 dark:text-amber-400' : (isExpiringSoon(sw.sendAt) ? 'text-orange-500 dark:text-orange-400' : 'text-indigo-600 dark:text-indigo-400')))"
                                         class="text-sm font-mono font-bold block"
                                         x-text="sw.disabled ? 'PAUSED' : (sw.sent ? 'STOPPED' : getCountdown(sw.sendAt))"></span>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="pt-4 border-t border-white/5 mt-4">
+                        <div class="pt-4 border-t border-gray-200 dark:border-white/5 mt-4">
                             <button @click="resetSw(sw.id)" :disabled="resettingId === sw.id"
-                                :class="resettingId === sw.id ? 'bg-emerald-500 text-black border-emerald-500 scale-[0.97]' : (sw.disabled ? 'bg-white/10 text-white border-white/10 hover:bg-white/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20')"
+                                :class="resettingId === sw.id ? 'bg-emerald-500 text-black border-emerald-500 scale-[0.97]' : (sw.disabled ? 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/20')"
                                 class="w-full py-4 border text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden relative active:scale-95">
                                 <span x-show="resettingId !== sw.id"
                                     x-text="sw.disabled ? 'Enable' : 'Check In'"></span>
@@ -212,28 +257,28 @@
 
     <div x-show="openModal" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
         <div x-show="openModal" x-transition.opacity @click="openModal = false"
-            class="fixed inset-0 bg-black/90 backdrop-blur-sm"></div>
+            class="fixed inset-0 bg-gray-900/50 dark:bg-black/90 backdrop-blur-sm"></div>
         <div x-show="openModal" x-transition:enter="transition ease-out duration-300 transform"
             x-transition:enter-start="translate-y-full sm:scale-95"
-            class="relative w-full max-w-lg bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            class="relative w-full max-w-lg bg-white dark:bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-gray-200 dark:border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <form @submit.prevent="saveSw">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-black text-white" x-text="editingId ? 'Edit Switch' : 'New Switch'"></h3>
+                    <h3 class="text-xl font-black text-gray-900 dark:text-white" x-text="editingId ? 'Edit Switch' : 'New Switch'"></h3>
                     <button type="button" @click="openModal = false"
                         class="text-gray-500 text-xs font-bold uppercase">Close</button>
                 </div>
 
                 <template x-if="isReminderEnabled(sw)">
                     <div
-                        class="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+                        class="mb-6 p-4 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 rounded-2xl flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <div
                                 class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]">
                             </div>
                             <div>
-                                <p class="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Push
+                                <p class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Push
                                     Notifications On</p>
-                                <p class="text-[9px] text-emerald-400/60 uppercase font-medium">Ready for reminders</p>
+                                <p class="text-[9px] text-emerald-600/60 dark:text-emerald-400/60 uppercase font-medium">Ready for reminders</p>
                             </div>
                         </div>
                     </div>
@@ -243,14 +288,14 @@
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Message</label>
                         <input x-model="form.message" type="text" required
-                            class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-indigo-500">
+                            class="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-gray-900 dark:text-white outline-none focus:border-indigo-500">
                     </div>
 
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Check-In Interval (e.g.
                             24h)</label>
                         <input x-model="form.checkInInterval" type="text" required
-                            class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white outline-none focus:border-indigo-500">
+                            class="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-gray-900 dark:text-white outline-none focus:border-indigo-500">
                     </div>
 
                     <div>
@@ -258,29 +303,29 @@
                             <label class="text-[10px] font-bold text-gray-500 uppercase block">Notifiers (one per
                                 line)</label>
                             <a href="https://shoutrrr.nickfedor.com/latest/services/overview/" target="_blank"
-                                class="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 uppercase underline decoration-indigo-500/30 underline-offset-2">Docs
+                                class="text-[9px] font-bold text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 uppercase underline decoration-indigo-500/30 underline-offset-2">Docs
                                 &rarr;</a>
                         </div>
                         <textarea x-model="form.notifiersStr"
-                            class="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-24 text-sm font-mono"
+                            class="w-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl p-4 text-gray-900 dark:text-white h-24 text-sm font-mono"
                             placeholder="discord://webhookId@token"></textarea>
                     </div>
 
-                    <div x-show="isSecure" class="pt-4 border-t border-white/5 space-y-4">
+                    <div x-show="isSecure" class="pt-4 border-t border-gray-200 dark:border-white/5 space-y-4">
                         <div class="flex justify-between items-center">
                             <label class="text-[10px] font-bold text-gray-500 uppercase block">Push Reminder
                                 Threshold</label>
-                            <span class="text-xs font-black text-indigo-400"
+                            <span class="text-xs font-black text-indigo-500 dark:text-indigo-400"
                                 x-text="reminderSteps[form.reminderIndex].label === 'Off' ? 'Disabled' : reminderSteps[form.reminderIndex].label + ' before'"></span>
                         </div>
                         <div class="px-1 py-4">
                             <input type="range" min="0" :max="reminderSteps.length - 1" step="1"
                                 x-model="form.reminderIndex" @input="updateReminderFromSlider()"
-                                class="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                                class="w-full h-1.5 bg-gray-200 dark:bg-white/10 rounded-lg appearance-none cursor-pointer accent-indigo-500">
                             <div class="flex justify-between mt-4">
                                 <template x-for="(step, index) in reminderSteps" :key="index">
                                     <span class="text-[7px] font-bold uppercase"
-                                        :class="form.reminderIndex == index ? 'text-indigo-400' : 'text-gray-600'"
+                                        :class="form.reminderIndex == index ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-600'"
                                         x-text="step.label"></span>
                                 </template>
                             </div>
@@ -289,11 +334,11 @@
 
                     <div class="flex gap-4">
                         <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.deleteAfterSent"
-                                type="checkbox" class="rounded bg-white/5 text-indigo-500"><span
-                                class="text-[10px] text-gray-400">Auto-Delete</span></label>
+                                type="checkbox" class="rounded bg-gray-200 dark:bg-white/5 text-indigo-500 border-gray-300 dark:border-transparent"><span
+                                class="text-[10px] text-gray-500 dark:text-gray-400">Auto-Delete</span></label>
                         <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.encrypted"
-                                type="checkbox" class="rounded bg-white/5 text-indigo-500"><span
-                                class="text-[10px] text-gray-400">Encrypted</span></label>
+                                type="checkbox" class="rounded bg-gray-200 dark:bg-white/5 text-indigo-500 border-gray-300 dark:border-transparent"><span
+                                class="text-[10px] text-gray-500 dark:text-gray-400">Encrypted</span></label>
                     </div>
                 </div>
                 <button type="submit"
@@ -311,6 +356,7 @@
                 showInsecureWarning: true,
                 notifyStatus: ('Notification' in window) ? Notification.permission : 'unsupported',
                 vapidPublicKey: '',
+                darkMode: document.documentElement.classList.contains('dark'),
                 reminderSteps: [
                     { label: 'Off', value: '' },
                     { label: '5m', value: '5m' },
@@ -336,6 +382,18 @@
 
                 updateReminderFromSlider() {
                     this.form.reminderThreshold = this.reminderSteps[this.form.reminderIndex].value;
+                },
+
+                toggleTheme() {
+                    if (this.darkMode) {
+                        document.documentElement.classList.remove('dark');
+                        localStorage.theme = 'light';
+                        this.darkMode = false;
+                    } else {
+                        document.documentElement.classList.add('dark');
+                        localStorage.theme = 'dark';
+                        this.darkMode = true;
+                    }
                 },
 
                 async init() {
@@ -614,5 +672,4 @@
         </div>
     </div>
 </body>
-
 </html>
