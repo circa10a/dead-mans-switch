@@ -153,9 +153,18 @@
 
     <main class="max-w-3xl mx-auto px-4 py-6 pb-32 min-h-screen">
         <div class="space-y-4">
-            <template x-for="sw in switches" :key="sw.id">
-                <div class="glass border border-gray-200 dark:border-white/5 rounded-2xl p-5 shadow-sm dark:shadow-2xl relative overflow-hidden group transition-all duration-500"
-                    :class="sw.status === 'disabled' ? 'disabled-card-container' : ''">
+            <template x-for="(sw, index) in switches" :key="sw.id">
+                <div 
+                    draggable="true"
+                    @dragstart="dragStart($event, index)"
+                    @dragover.prevent
+                    @drop="drop($event, index)"
+                    @dragend="dragEnd()"
+                    class="glass border border-gray-200 dark:border-white/5 rounded-2xl p-5 shadow-sm dark:shadow-2xl relative overflow-hidden group transition-all duration-300 cursor-grab active:cursor-grabbing"
+                    :class="[
+                        sw.status === 'disabled' ? 'disabled-card-container' : '',
+                        draggingIndex === index ? 'opacity-20 scale-95 border-dashed border-indigo-400 dark:border-indigo-500' : ''
+                    ]">
 
                     <div :class="sw.status === 'disabled' ? '' : (sw.status === 'triggered' || sw.status === 'failed' ? 'bg-red-500/10' : (isPending(sw) ? 'bg-amber-500/20 animate-pulse' : (isExpiringSoon(sw.triggerAt) ? 'bg-orange-500/20 animate-pulse' : 'bg-emerald-500/5')))"
                         class="absolute inset-0 pointer-events-none transition-colors duration-1000"></div>
@@ -172,7 +181,7 @@
                                     :class="sw.status === 'failed' ? 'animate-pulse ring-1 ring-red-500/50' : ''"
                                     x-text="sw.status === 'disabled' ? 'Paused' : (sw.status === 'triggered' ? 'Triggered' : (sw.status === 'failed' ? 'Failed' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.triggerAt) ? 'Soon' : 'Active'))))">
                                 </span>
-
+                                
                                 <template x-if="isReminderEnabled(sw)">
                                     <div class="flex items-center justify-center text-indigo-500 dark:text-indigo-400 animate-pulse"
                                         title="Push Notifications Enabled">
@@ -357,6 +366,10 @@
                 notifyStatus: ('Notification' in window) ? Notification.permission : 'unsupported',
                 vapidPublicKey: '',
                 darkMode: document.documentElement.classList.contains('dark'),
+                
+                // Drag and Drop state
+                draggingIndex: null,
+
                 reminderSteps: [
                     { label: 'Off', value: '' },
                     { label: '5m', value: '5m' },
@@ -410,21 +423,14 @@
                         }
                     } catch (e) {
                         console.error("Could not fetch VAPID key", e);
-                        // Note: We don't set isOnline false here yet,
-                        // as the server might be up but just missing the VAPID endpoint.
                     }
 
                     // Immediate Permission Request & SW Registration
                     if ('Notification' in window) {
-                        // Update current status (granted, denied, or default)
                         this.notifyStatus = Notification.permission;
-
-                        // If we haven't asked yet, ask now
                         if (Notification.permission === 'default') {
                             this.notifyStatus = await Notification.requestPermission();
                         }
-
-                        // If permission is granted, register Service Worker
                         if (this.notifyStatus === 'granted' && 'serviceWorker' in navigator) {
                             try {
                                 await navigator.serviceWorker.register('/sw.js');
@@ -436,25 +442,20 @@
                     }
 
                     // Background Sync for UI
-                    // Keep the bell icon status updated if permissions change in browser settings
                     setInterval(() => {
                         if ('Notification' in window) {
                             this.notifyStatus = Notification.permission;
                         }
                     }, 2000);
 
-                    // Update the "now" timestamp for the countdown timers every second
                     setInterval(() => {
                         this.now = Date.now();
                     }, 1000);
 
-                    // Refresh the list of switches every 10 seconds (unless modal is open/busy)
-                    // This fetch also acts as a heartbeat for the 'isOnline' status
                     setInterval(() => {
                         if (!this.openModal && !this.resettingId) this.getSw();
                     }, 10000);
 
-                    // Initial data load
                     await this.getSw();
                 },
 
@@ -468,18 +469,15 @@
                 },
 
                isExpiringSoon(deadline) {
-                    // Convert Unix seconds to JS milliseconds
                     const diff = ((deadline * 1000) - this.now) / 60000;
                     return diff > 0 && diff <= 30;
                 },
 
                isPending(sw) {
-                    // Compare Unix seconds * 1000
                     return sw.status === 'active' && (sw.triggerAt * 1000 - this.now) <= 0;
                 },
 
                 getCountdown(deadline) {
-                    // deadline is Unix seconds
                     const total = (deadline * 1000) - this.now;
                     if (isNaN(total) || total <= 0) return "00:00:00";
 
@@ -554,15 +552,67 @@
                 },
 
                 async getSw() {
+                    // Prevent updates if user is currently dragging to avoid jumpiness
+                    if (this.draggingIndex !== null) return;
+
                     try {
                         const r = await fetch(`${this.baseUrl}/switch`);
                         if (!r.ok) throw new Error("Server error");
-                        this.switches = await r.json();
-                        this.isOnline = true; // Connection is healthy
+                        const data = await r.json();
+                        
+                        // Apply custom sort order
+                        this.switches = this.sortSwitches(data);
+                        
+                        this.isOnline = true;
                     } catch (e) {
-                        this.isOnline = false; // Connection failed
+                        this.isOnline = false;
                         console.error("Fetch failed:", e);
                     }
+                },
+
+                // Drag and Drop
+                sortSwitches(data) {
+                    const savedOrder = localStorage.getItem('switchOrder');
+                    if (!savedOrder) return data;
+                    
+                    try {
+                        const orderIds = JSON.parse(savedOrder);
+                        const orderMap = new Map(orderIds.map((id, index) => [id, index]));
+                        
+                        return data.sort((a, b) => {
+                            const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+                            const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+                            return indexA - indexB;
+                        });
+                    } catch(e) { return data; }
+                },
+
+                dragStart(e, index) {
+                    this.draggingIndex = index;
+                    e.dataTransfer.effectAllowed = 'move';
+                    // Firefox requires data to be set for drag to work
+                    e.dataTransfer.setData('text/plain', index); 
+                },
+
+                drop(e, targetIndex) {
+                    if (this.draggingIndex === null) return;
+                    
+                    const item = this.switches[this.draggingIndex];
+                    
+                    // Remove from old position
+                    this.switches.splice(this.draggingIndex, 1);
+                    // Insert at new position
+                    this.switches.splice(targetIndex, 0, item);
+                    
+                    this.draggingIndex = null;
+                    
+                    // Save new order to localStorage
+                    const newOrder = this.switches.map(s => s.id);
+                    localStorage.setItem('switchOrder', JSON.stringify(newOrder));
+                },
+
+                dragEnd() {
+                    this.draggingIndex = null;
                 },
 
                 async resetSw(id) {
@@ -592,8 +642,6 @@
                         pushSubscription: currentSub
                     };
 
-                    // if we didn't get a fresh sub and the form has the redacted one,
-                    // remove it from the payload so we don't overwrite the DB with empty data.
                     if (!currentSub && payload.pushSubscription && Object.keys(payload.pushSubscription).length === 0) {
                         delete payload.pushSubscription;
                     };
