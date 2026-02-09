@@ -274,13 +274,26 @@ func (s *Switch) DisableHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	disabledSwitch, err := s.Store.Disable(id)
+	switchToDisable, err := s.Store.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			s.sendError(w, http.StatusNotFound, "switch not found", err)
+			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
 			return
 		}
-		s.sendError(w, http.StatusInternalServerError, "failed to disable switch", err)
+		s.sendError(w, http.StatusInternalServerError, errDatabaseError, err)
+		return
+	}
+
+	v := true
+	switchToDisable.Disabled = &v
+
+	disabledSwitch, err := s.Store.Update(id, switchToDisable)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
+			return
+		}
+		s.sendError(w, http.StatusInternalServerError, errFailedToReset, err)
 		return
 	}
 

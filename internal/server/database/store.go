@@ -24,8 +24,6 @@ type Store interface {
 	Update(id int, sw api.Switch) (api.Switch, error)
 	// Delete removes a switch record from the store.
 	Delete(id int) error
-	// Disable disables a switch to it will not be monitored.
-	Disable(id int) (api.Switch, error)
 	// ReminderSent flags a switch so the PWA reminder isn't sent repeatedly in the same cycle.
 	ReminderSent(id int) (api.Switch, error)
 	// Sent marks a specific switch as having been processed/sent.

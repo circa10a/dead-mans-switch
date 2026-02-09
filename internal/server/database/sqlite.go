@@ -300,26 +300,6 @@ func (s *SQLiteStore) Delete(id int) error {
 	return err
 }
 
-// Disable sets the disabled status of a switch to true.
-func (s *SQLiteStore) Disable(id int) (api.Switch, error) {
-	query := `UPDATE switches SET disabled = 1 WHERE id = ?`
-	result, err := s.db.Exec(query, id)
-	if err != nil {
-		return api.Switch{}, fmt.Errorf("failed to disable switch: %w", err)
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return api.Switch{}, err
-	}
-
-	if rows == 0 {
-		return api.Switch{}, sql.ErrNoRows
-	}
-
-	return s.GetByID(id)
-}
-
 // ReminderSent marks the reminder on the switch with the given ID as sent.
 func (s *SQLiteStore) ReminderSent(id int) (api.Switch, error) {
 	_, err := s.db.Exec(`UPDATE switches SET reminder_sent = 1 WHERE id = ?`, id)
