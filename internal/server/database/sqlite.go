@@ -247,7 +247,7 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		}
 	}
 
-	query := `UPDATE switches SET check_in_interval=?, delete_after_triggered=?, encrypted=?, message=?, notifiers=?, push_subscription=?, reminder_enabled=?, reminder_sent=0, reminder_threshold=?, status=?, trigger_at=? WHERE id=?`
+	query := `UPDATE switches SET check_in_interval=?, delete_after_triggered=?, encrypted=?, message=?, notifiers=?, push_subscription=?, reminder_enabled=?, reminder_sent=?, reminder_threshold=?, status=?, trigger_at=? WHERE id=?`
 
 	res, err := s.db.Exec(
 		query,
@@ -258,6 +258,7 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		notifiers,
 		pushSubscription,
 		sw.ReminderEnabled != nil && *sw.ReminderEnabled,
+		sw.ReminderSent != nil && *sw.ReminderSent,
 		sw.ReminderThreshold,
 		sw.Status,
 		sw.TriggerAt,

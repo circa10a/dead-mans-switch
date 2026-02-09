@@ -166,7 +166,11 @@ func (w *Worker) processReminder(sw api.Switch) error {
 		}
 
 		w.Logger.Debug("Marking reminder as sent in database", "id", *sw.Id)
-		_, reminderSentErr := w.Store.ReminderSent(*sw.Id)
+
+		v := true
+		sw.ReminderSent = &v
+
+		_, reminderSentErr := w.Store.Update(*sw.Id, sw)
 		return reminderSentErr
 	}
 

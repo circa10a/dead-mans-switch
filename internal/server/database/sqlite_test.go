@@ -134,7 +134,7 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 		}
 	})
 
-	t.Run("GetEligibleReminders and MarkReminderSent", func(t *testing.T) {
+	t.Run("GetEligibleReminders", func(t *testing.T) {
 		oneSecondAgo := time.Now().Unix() - 1
 		sw := api.Switch{
 			Message:           "Eligible",
@@ -167,7 +167,8 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 			t.Error("created switch was not found in eligible reminders list")
 		}
 
-		_, err = store.ReminderSent(*created.Id)
+		created.ReminderSent = ptr(true)
+		_, err = store.Update(*created.Id, created)
 		if err != nil {
 			t.Fatalf("failed to mark reminder sent: %v", err)
 		}
@@ -178,7 +179,7 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 		}
 		for _, s := range eligible {
 			if *s.Id == *created.Id {
-				t.Error("switch still showing as eligible after being marked triggered")
+				t.Error("switch still showing reminder as eligible after being marked sent")
 			}
 		}
 	})

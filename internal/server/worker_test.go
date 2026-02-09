@@ -16,7 +16,6 @@ type MockStore struct {
 	GetEligibleRemindersFunc func(limit int) ([]api.Switch, error)
 	DeleteFunc               func(id int) error
 	SentFunc                 func(id int) error
-	MarkReminderSentFunc     func(id int) error
 
 	DeletedCalled          bool
 	SentCalled             bool
@@ -27,18 +26,23 @@ type MockStore struct {
 func (m *MockStore) Init() error {
 	return nil
 }
+
 func (m *MockStore) Create(sw api.Switch) (api.Switch, error) {
 	return sw, nil
 }
+
 func (m *MockStore) GetAll(limit int) ([]api.Switch, error) {
 	return nil, nil
 }
+
 func (m *MockStore) GetByID(id int) (api.Switch, error) {
 	return api.Switch{}, nil
 }
+
 func (m *MockStore) GetExpired(limit int) ([]api.Switch, error) {
 	return m.GetExpiredFunc(limit)
 }
+
 func (m *MockStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
 	if m.GetEligibleRemindersFunc != nil {
 		return m.GetEligibleRemindersFunc(limit)
@@ -46,32 +50,35 @@ func (m *MockStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
 	return nil, nil
 }
 
-func (m *MockStore) ReminderSent(id int) (api.Switch, error) {
-	m.MarkReminderSentCalled = true
-	if m.MarkReminderSentFunc != nil {
-		return api.Switch{}, m.MarkReminderSentFunc(id)
-	}
-	return api.Switch{}, nil
-}
 func (m *MockStore) Update(id int, sw api.Switch) (api.Switch, error) {
 	if *sw.Status == api.SwitchStatusTriggered {
 		m.SentCalled = true
 	}
+
+	if sw.ReminderSent != nil && *sw.ReminderSent {
+		m.MarkReminderSentCalled = true
+	}
+
 	return sw, nil
 }
+
 func (m *MockStore) Delete(id int) error {
 	m.DeletedCalled = true
 	return m.DeleteFunc(id)
 }
+
 func (m *MockStore) EncryptSwitch(*api.Switch) error {
 	return nil
 }
+
 func (m *MockStore) DecryptSwitch(*api.Switch) error {
 	return nil
 }
+
 func (m *MockStore) Ping() error {
 	return nil
 }
+
 func (m *MockStore) Close() error {
 	return nil
 }

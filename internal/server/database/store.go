@@ -18,14 +18,12 @@ type Store interface {
 	GetByID(id int) (api.Switch, error)
 	// GetExpired retrieves switches whose trigger_at time has passed but haven't been sent.
 	GetExpired(limit int) ([]api.Switch, error)
-	// GetEligibleReminders retrieves switches that are approaching expiry but haven't had a PWA reminder sent yet.
+	// GetEligibleReminders retrieves switches that are approaching expiry but haven't had a reminder sent yet.
 	GetEligibleReminders(limit int) ([]api.Switch, error)
-	// Update modifies an existing switch's message, notifiers, and interval.
+	// Update updates an existing switch.
 	Update(id int, sw api.Switch) (api.Switch, error)
 	// Delete removes a switch record from the store.
 	Delete(id int) error
-	// ReminderSent flags a switch so the PWA reminder isn't sent repeatedly in the same cycle.
-	ReminderSent(id int) (api.Switch, error)
 	// Encrypt encrypts sensitive content.
 	EncryptSwitch(*api.Switch) error
 	// Decrypt encrypts sensitive content.
