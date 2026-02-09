@@ -39,28 +39,24 @@ type Switch struct {
 func (s *Switch) PostHandleFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	payload, ok := middleware.FromContext(r.Context())
+	// Use the new wrapper struct from context
+	val, ok := middleware.FromContext(r.Context())
 	if !ok {
 		s.sendError(w, http.StatusInternalServerError, "Internal context error", nil)
 		return
 	}
-
-	duration, err := time.ParseDuration(payload.CheckInInterval)
-	if err != nil {
-		s.sendError(w, http.StatusBadRequest, errTimeParse, err)
-		return
-	}
+	payload := val.Payload
 
 	// Set as active
 	statusActive := api.SwitchStatusActive
 	payload.Status = &statusActive
 
-	// Compute time at which to send
-	TriggerAt := time.Now().Add(duration).Unix()
-	payload.TriggerAt = &TriggerAt
+	// Compute time at which to send using pre-parsed duration
+	triggerAt := time.Now().Add(val.CheckInIntervalDuration).Unix()
+	payload.TriggerAt = &triggerAt
 
-	// If push subscription and threshold defined, set reminderEnabled to true
-	reminderEnabled := payload.PushSubscription != nil && payload.ReminderThreshold != nil && *payload.ReminderThreshold != ""
+	// Simplified reminder logic using the pre-parsed pointer
+	reminderEnabled := payload.PushSubscription != nil && val.ReminderThresholdDuration != nil
 	payload.ReminderEnabled = &reminderEnabled
 
 	createdSwitch, err := s.Store.Create(payload)
@@ -138,13 +134,13 @@ func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payload, ok := middleware.FromContext(r.Context())
+	val, ok := middleware.FromContext(r.Context())
 	if !ok {
 		s.sendError(w, http.StatusInternalServerError, "Internal context error", nil)
 		return
 	}
+	payload := val.Payload
 
-	// Get existing checkInInterval, if changed, set the new time
 	previousSwitch, err := s.Store.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -155,30 +151,21 @@ func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Keep existing send time
+	// Default to existing trigger time
 	payload.TriggerAt = previousSwitch.TriggerAt
 
-	// Change send time if checkInInterval changed
+	// Change trigger time if checkInInterval changed, using pre-parsed duration
 	if previousSwitch.CheckInInterval != payload.CheckInInterval {
-		duration, err := time.ParseDuration(payload.CheckInInterval)
-		if err != nil {
-			s.sendError(w, http.StatusBadRequest, "Invalid checkInInterval time format. Examples are 10s, 10m, 10h, 10d", err)
-			return
-		}
-		updatedTriggerAt := time.Now().Add(duration).Unix()
+		updatedTriggerAt := time.Now().Add(val.CheckInIntervalDuration).Unix()
 		payload.TriggerAt = &updatedTriggerAt
 	}
 
-	// If push subscription and threshold defined, set reminderEnabled to true
-	reminderEnabled := payload.PushSubscription != nil && payload.ReminderThreshold != nil && *payload.ReminderThreshold != ""
+	// Set reminder status
+	reminderEnabled := payload.PushSubscription != nil && val.ReminderThresholdDuration != nil
 	payload.ReminderEnabled = &reminderEnabled
 
 	updatedSwitch, err := s.Store.Update(id, payload)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			s.sendError(w, http.StatusNotFound, errSwitchNotFound, nil)
-			return
-		}
 		s.sendError(w, http.StatusInternalServerError, "Failed to update switch", err)
 		return
 	}

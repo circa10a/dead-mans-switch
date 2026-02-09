@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,12 +17,21 @@ import (
 type contextKey string
 
 // SwitchContextKey is the context key for accessing the value of a validated switch in
-const SwitchContextKey contextKey = "validatedSwitch"
+const (
+	SwitchContextKey contextKey = "validatedSwitch"
+)
+
+// ValidatedSwitch contains parsed payload/time fields to prevent parsing twice.
+type ValidatedSwitch struct {
+	Payload                   api.Switch
+	CheckInIntervalDuration   time.Duration
+	ReminderThresholdDuration *time.Duration // Pointer since reminder is optional
+}
 
 // FromContext grabs a Switch payload from the context to ensure we only read the body once
 // since we read the body to perform validation in this middleware.
-func FromContext(ctx context.Context) (api.Switch, bool) {
-	sw, ok := ctx.Value(SwitchContextKey).(api.Switch)
+func FromContext(ctx context.Context) (ValidatedSwitch, bool) {
+	sw, ok := ctx.Value(SwitchContextKey).(ValidatedSwitch)
 	return sw, ok
 }
 
@@ -34,14 +42,13 @@ func SwitchValidator(v *validator.Validate) func(http.Handler) http.Handler {
 			payload := api.Switch{}
 
 			// Read the body
+			// we don't need to restore the body since we pass the validated payload
+			// through the context
 			bodyBytes, err := io.ReadAll(r.Body)
 			if err != nil {
 				sendJSONError(w, http.StatusBadRequest, "Read error")
 				return
 			}
-
-			// Restore body for any subsequent reads (though usually not needed if using context)
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 			err = json.Unmarshal(bodyBytes, &payload)
 			if err != nil {
@@ -49,18 +56,20 @@ func SwitchValidator(v *validator.Validate) func(http.Handler) http.Handler {
 				return
 			}
 
-			_, err = time.ParseDuration(payload.CheckInInterval)
+			checkInIntervalDuration, err := time.ParseDuration(payload.CheckInInterval)
 			if err != nil {
 				sendJSONError(w, http.StatusBadRequest, "Invalid checkInInterval time format. Examples are 10s, 10m, 10h, 10d")
 				return
 			}
 
+			var reminderThresholdDuration *time.Duration
 			if payload.ReminderThreshold != nil && *payload.ReminderThreshold != "" {
-				_, err = time.ParseDuration(*payload.ReminderThreshold)
+				d, err := time.ParseDuration(*payload.ReminderThreshold)
 				if err != nil {
 					sendJSONError(w, http.StatusBadRequest, "Invalid ReminderThreshold format (e.g., 15m, 1h)")
 					return
 				}
+				reminderThresholdDuration = &d
 			}
 
 			err = v.Struct(payload)
@@ -82,7 +91,13 @@ func SwitchValidator(v *validator.Validate) func(http.Handler) http.Handler {
 				return
 			}
 
-			ctx := context.WithValue(r.Context(), SwitchContextKey, payload)
+			validatedData := ValidatedSwitch{
+				Payload:                   payload,
+				CheckInIntervalDuration:   checkInIntervalDuration,
+				ReminderThresholdDuration: reminderThresholdDuration,
+			}
+
+			ctx := context.WithValue(r.Context(), SwitchContextKey, validatedData)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

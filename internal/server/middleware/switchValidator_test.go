@@ -23,7 +23,7 @@ func TestSwitchValidator(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		assert.Equal(t, "test message", sw.Message)
+		assert.Equal(t, "test message", sw.Payload.Message)
 		w.WriteHeader(http.StatusOK)
 	})
 
