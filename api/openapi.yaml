@@ -274,8 +274,8 @@ components:
         - checkInInterval
         - message
         - notifiers
-        - sendAt
-        - sent
+        - status
+        - triggerAt
       properties:
         id:
           type: integer
@@ -288,12 +288,9 @@ components:
           pattern: '^[0-9]+[smh]$'
           x-oapi-codegen-extra-tags:
             validate: required
-        disabled:
+        deleteAfterTriggered:
           type: boolean
-          description: "Disable the switch"
-        deleteAfterSent:
-          type: boolean
-          description: "Whether to delete the switch after sending"
+          description: "Whether to delete the switch after triggering"
         encrypted:
           type: boolean
           description: "Where or not to encrypt switch data. Data will no longer be readable via the API"
@@ -329,15 +326,20 @@ components:
           pattern: '^[0-9]+[smh]$'
         reminderSent:
           type: boolean
-          description: "If push notifications have been sent"
+          description: "If push notifications have been triggered"
           readOnly: true
-        sent:
-          type: boolean
-          description: "If switch notifiers have been triggered"
+        status:
+          type: string
+          enum:
+            - active
+            - disabled
+            - failed
+            - triggered
+          description: "Current switch status"
           readOnly: true
-        sendAt:
+        triggerAt:
           type: integer
-          description: "Time to send in Unix time format to trigger switch"
+          description: "Time to trigger in Unix time format to trigger switch"
           format: int64
           example: 1737812700
           readOnly: true

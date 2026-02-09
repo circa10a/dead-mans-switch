@@ -22,10 +22,10 @@ func (h *Health) GetHandleFunc(w http.ResponseWriter, r *http.Request) {
 	// Check if DB is healthy
 	err := h.Store.Ping()
 	if err != nil {
-		status = api.Failed
+		status = api.HealthStatusFailed
 		w.WriteHeader(http.StatusServiceUnavailable)
 	} else {
-		status = api.Ok
+		status = api.HealthStatusOk
 		w.WriteHeader(http.StatusOK)
 	}
 

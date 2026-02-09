@@ -37,8 +37,8 @@ func TestHealthHandleFunc(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if resp.Status != api.Ok {
-			t.Errorf("expected status %s, got %s", api.Ok, resp.Status)
+		if resp.Status != api.HealthStatusOk {
+			t.Errorf("expected status %s, got %s", api.HealthStatusOk, resp.Status)
 		}
 	})
 
@@ -60,8 +60,8 @@ func TestHealthHandleFunc(t *testing.T) {
 		resp := api.Health{}
 		_ = json.NewDecoder(rec.Body).Decode(&resp)
 
-		if resp.Status != api.Failed {
-			t.Errorf("expected status %s, got %s", api.Failed, resp.Status)
+		if resp.Status != api.HealthStatusFailed {
+			t.Errorf("expected status %s, got %s", api.HealthStatusFailed, resp.Status)
 		}
 	})
 }

@@ -21,6 +21,12 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+var (
+	statusActive    = api.SwitchStatusActive
+	statusDisabled  = api.SwitchStatusDisabled
+	statusTriggered = api.SwitchStatusTriggered
+)
+
 // setupTestHandler initializes a Switch handler with a temporary database
 func setupTestHandler(t *testing.T) (*Switch, database.Store) {
 	t.Helper()
@@ -52,10 +58,10 @@ func TestPostHandleFunc(t *testing.T) {
 
 	t.Run("successfully creates a switch with message", func(t *testing.T) {
 		payload := api.Switch{
-			Message:         "Secret Message",
-			Notifiers:       []string{"logger://", "discord://token@id"},
-			CheckInInterval: "24h",
-			DeleteAfterSent: ptr(true),
+			Message:              "Secret Message",
+			Notifiers:            []string{"logger://", "discord://token@id"},
+			CheckInInterval:      "24h",
+			DeleteAfterTriggered: ptr(true),
 		}
 		body, err := json.Marshal(payload)
 		if err != nil {
@@ -292,11 +298,12 @@ func TestPostHandleFunc(t *testing.T) {
 func TestGetHandleFunc(t *testing.T) {
 	s, store := setupTestHandler(t)
 
-	// Seed data: 1 unsent, 2 sent
+	// Seed data: 1 triggered, 2 active
 	_, err := store.Create(api.Switch{
 		Message:         "m1",
 		Notifiers:       []string{"active-1"},
 		CheckInInterval: "1h",
+		Status:          &statusActive,
 	})
 	if err != nil {
 		t.Fatalf("failed to create switch: %v", err)
@@ -305,6 +312,7 @@ func TestGetHandleFunc(t *testing.T) {
 		Message:         "m2",
 		Notifiers:       []string{"triggered-1"},
 		CheckInInterval: "1h",
+		Status:          &statusActive,
 	})
 	if err != nil {
 		t.Fatalf("failed to create switch: %v", err)
@@ -313,22 +321,31 @@ func TestGetHandleFunc(t *testing.T) {
 		Message:         "m3",
 		Notifiers:       []string{"triggered-2"},
 		CheckInInterval: "1h",
+		Status:          &statusActive,
 	})
 	if err != nil {
 		t.Fatalf("failed to create switch: %v", err)
 	}
 
-	// Mark two as sent
-	sentSwitch2, err := store.Sent(*s2.Id)
+	// Mark as as triggered
+	s2.Status = &statusTriggered
+	triggeredSwitch2, err := s.Store.Update(*s2.Id, s2)
 	if err != nil {
-		t.Fatalf("failed to update switch as sent: %v", err)
+		t.Fatalf("failed to marks switch as triggered: %v", err)
 	}
-	if !*sentSwitch2.Sent {
-		t.Errorf("failed to mark switch as sent: %v", err)
+
+	if *triggeredSwitch2.Status != api.SwitchStatusTriggered {
+		t.Errorf("failed to mark switch as triggered: %v", err)
 	}
-	sentSwitch3, err := store.Sent(*s3.Id)
-	if !*sentSwitch3.Sent {
-		t.Errorf("failed to mark switch as sent: %v", err)
+
+	s3.Status = &statusTriggered
+	triggeredSwitch3, err := s.Store.Update(*s3.Id, s3)
+	if err != nil {
+		t.Fatalf("failed to marks switch as triggered: %v", err)
+	}
+
+	if *triggeredSwitch3.Status != api.SwitchStatusTriggered {
+		t.Errorf("failed to mark switch as triggerd: %v", err)
 	}
 
 	t.Run("returns all switches with messages", func(t *testing.T) {
@@ -376,6 +393,7 @@ func TestGetByIDHandleFunc(t *testing.T) {
 		Message:         "Find Me",
 		Notifiers:       []string{"logger://"},
 		CheckInInterval: "1h",
+		Status:          &statusActive,
 	})
 	if err != nil {
 		t.Fatalf("failed to seed switch: %v", err)
@@ -427,24 +445,26 @@ func TestPutSwitchId(t *testing.T) {
 	v := validator.New()
 	mw := middleware.SwitchValidator(v)
 
-	t.Run("successfully updates an existing switch including deleteAfterSent", func(t *testing.T) {
+	t.Run("successfully updates an existing switch including DeleteAfterTriggered", func(t *testing.T) {
 		initial := api.Switch{
-			Message:         "Original Message",
-			Notifiers:       []string{"generic://general1"},
-			CheckInInterval: "24h",
-			DeleteAfterSent: ptr(false),
+			Message:              "Original Message",
+			Notifiers:            []string{"generic://general1"},
+			CheckInInterval:      "24h",
+			DeleteAfterTriggered: ptr(false),
+			Status:               &statusActive,
 		}
 		created, err := store.Create(initial)
 		if err != nil {
 			t.Fatalf("failed to seed switch: %v", err)
 		}
 
-		// Toggle deleteAfterSent to true and change other fields
+		// Toggle DeleteAfterTriggered to true and change other fields
 		updatedPayload := api.Switch{
-			Message:         "Updated Message",
-			Notifiers:       []string{"generic://general2"},
-			CheckInInterval: "12h",
-			DeleteAfterSent: ptr(true),
+			Message:              "Updated Message",
+			Notifiers:            []string{"generic://general2"},
+			CheckInInterval:      "12h",
+			DeleteAfterTriggered: ptr(true),
+			Status:               &statusActive,
 		}
 		body, err := json.Marshal(updatedPayload)
 		if err != nil {
@@ -472,8 +492,8 @@ func TestPutSwitchId(t *testing.T) {
 		if resp.Message != updatedPayload.Message {
 			t.Errorf("expected message %s, got %s", updatedPayload.Message, resp.Message)
 		}
-		if *resp.DeleteAfterSent != *updatedPayload.DeleteAfterSent {
-			t.Errorf("expected deleteAfterSent %v, got %v", updatedPayload.DeleteAfterSent, resp.DeleteAfterSent)
+		if *resp.DeleteAfterTriggered != *updatedPayload.DeleteAfterTriggered {
+			t.Errorf("expected DeleteAfterTriggered %v, got %v", updatedPayload.DeleteAfterTriggered, resp.DeleteAfterTriggered)
 		}
 		if resp.CheckInInterval != updatedPayload.CheckInInterval {
 			t.Errorf("expected interval %s, got %s", updatedPayload.CheckInInterval, resp.CheckInInterval)
@@ -482,22 +502,23 @@ func TestPutSwitchId(t *testing.T) {
 
 	t.Run("successfully updates an existing switch including disabled", func(t *testing.T) {
 		initial := api.Switch{
-			Message:         "Original Message",
-			Notifiers:       []string{"generic://general1"},
-			CheckInInterval: "24h",
-			DeleteAfterSent: ptr(false),
+			Message:              "Original Message",
+			Notifiers:            []string{"generic://general1"},
+			CheckInInterval:      "24h",
+			DeleteAfterTriggered: ptr(false),
+			Status:               &statusActive,
 		}
 		created, err := store.Create(initial)
 		if err != nil {
 			t.Fatalf("failed to seed switch: %v", err)
 		}
 
-		// Toggle disabled to true and change other fields
+		// Set status to disabled  and change other fields
 		updatedPayload := api.Switch{
 			Message:         "Updated Message for disabled switch",
 			Notifiers:       []string{"generic://general2"},
 			CheckInInterval: "12h",
-			Disabled:        ptr(true),
+			Status:          &statusDisabled,
 		}
 		body, err := json.Marshal(updatedPayload)
 		if err != nil {
@@ -521,34 +542,36 @@ func TestPutSwitchId(t *testing.T) {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		// Verify all fields updated correctly
-		if *resp.Disabled != *updatedPayload.Disabled {
-			t.Errorf("expected disabled %s, got %s", updatedPayload.Message, resp.Message)
+		// Verify status field updated correctly
+		if *resp.Status != api.SwitchStatusDisabled {
+			t.Errorf("expected status to be %s, got %s", api.SwitchStatusDisabled, *resp.Status)
 		}
 	})
 
-	t.Run("ensure sendAt is updated when checkInInterval changed", func(t *testing.T) {
+	t.Run("ensure TriggerAt is updated when checkInInterval changed", func(t *testing.T) {
 		createInterval := "24h"
 		updateInterval := "12h"
 		parsedUpdateInterval, _ := time.ParseDuration(updateInterval)
-		expectedSendAt := time.Now().Add(parsedUpdateInterval).Unix()
+		expectedTriggerAt := time.Now().Add(parsedUpdateInterval).Unix()
 
 		initial := api.Switch{
-			Message:         "Original Message",
-			Notifiers:       []string{"generic://general1"},
-			CheckInInterval: createInterval,
-			DeleteAfterSent: ptr(false),
+			Message:              "Original Message",
+			Notifiers:            []string{"generic://general1"},
+			CheckInInterval:      createInterval,
+			DeleteAfterTriggered: ptr(false),
+			Status:               &statusActive,
 		}
 		created, err := store.Create(initial)
 		if err != nil {
 			t.Fatalf("failed to seed switch: %v", err)
 		}
 
-		// Toggle disabled to true and change other fields
+		// Change status to disabled disabled to true and change other fields
 		updatedPayload := api.Switch{
 			Message:         "Updated Message for disabled switch",
 			Notifiers:       []string{"generic://general2"},
 			CheckInInterval: updateInterval,
+			Status:          &statusDisabled,
 		}
 		body, err := json.Marshal(updatedPayload)
 		if err != nil {
@@ -571,45 +594,47 @@ func TestPutSwitchId(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if resp.SendAt == nil {
-			t.Fatal("expected sendAt to be non-nil in response")
+		if resp.TriggerAt == nil {
+			t.Fatal("expected TriggerAt to be non-nil in response")
 		}
 
 		// We allow a 5-second delta to account for execution time
-		delta := *resp.SendAt - expectedSendAt
+		delta := *resp.TriggerAt - expectedTriggerAt
 		if delta < -5 || delta > 5 {
-			t.Errorf("sendAt was not updated correctly. Expected near %d, got %d (delta: %d seconds)",
-				expectedSendAt, *resp.SendAt, delta)
+			t.Errorf("TriggerAt was not updated correctly. Expected near %d, got %d (delta: %d seconds)",
+				expectedTriggerAt, *resp.TriggerAt, delta)
 		}
 
 		// Optional: Ensure it's significantly different from the "old" calculation
 		// if you want to be extra sure the interval was applied
 		parsedCreateInterval, _ := time.ParseDuration(createInterval)
 		oldExpected := time.Now().Add(parsedCreateInterval).Unix()
-		if *resp.SendAt >= oldExpected {
-			t.Errorf("sendAt seems to still be using the old interval. Got %d, which is >= old expected %d",
-				*resp.SendAt, oldExpected)
+		if *resp.TriggerAt >= oldExpected {
+			t.Errorf("TriggerAt seems to still be using the old interval. Got %d, which is >= old expected %d",
+				*resp.TriggerAt, oldExpected)
 		}
 	})
 
 	t.Run("create new switch and ensure encrypted", func(t *testing.T) {
 		initial := api.Switch{
-			Message:         "Original Message",
-			Notifiers:       []string{"generic://general1"},
-			CheckInInterval: "24h",
-			DeleteAfterSent: ptr(false),
+			Message:              "Original Message",
+			Notifiers:            []string{"generic://general1"},
+			CheckInInterval:      "24h",
+			DeleteAfterTriggered: ptr(false),
+			Status:               &statusActive,
 		}
 		created, err := store.Create(initial)
 		if err != nil {
 			t.Fatalf("failed to seed switch: %v", err)
 		}
 
-		// Toggle disabled to true and change other fields
+		// Toggle disabled to true and change other fields'
 		updatedPayload := api.Switch{
 			Message:         "Updated Message for disabled switch",
 			Notifiers:       []string{"generic://general2"},
 			CheckInInterval: "12h",
 			Encrypted:       ptr(true),
+			Status:          &statusDisabled,
 		}
 		body, err := json.Marshal(updatedPayload)
 		if err != nil {
@@ -641,10 +666,10 @@ func TestPutSwitchId(t *testing.T) {
 
 	t.Run("returns 404 for non-existent switch", func(t *testing.T) {
 		initial := api.Switch{
-			Message:         "Original Message",
-			Notifiers:       []string{"generic://general1"},
-			CheckInInterval: "24h",
-			DeleteAfterSent: ptr(false),
+			Message:              "Original Message",
+			Notifiers:            []string{"generic://general1"},
+			CheckInInterval:      "24h",
+			DeleteAfterTriggered: ptr(false),
 		}
 
 		body, _ := json.Marshal(initial)
@@ -665,6 +690,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Initial",
 			Notifiers:       []string{"logger://"},
 			CheckInInterval: "24h",
+			Status:          &statusActive,
 		}
 		created, _ := store.Create(initial)
 
@@ -674,6 +700,7 @@ func TestPutSwitchId(t *testing.T) {
 			CheckInInterval:   "24h",
 			PushSubscription:  &api.PushSubscription{},
 			ReminderThreshold: ptr("10m"),
+			Status:            &statusActive,
 		}
 		body, _ := json.Marshal(payload)
 
@@ -697,6 +724,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Initial",
 			Notifiers:       []string{"logger://"},
 			CheckInInterval: "24h",
+			Status:          &statusActive,
 		}
 		created, _ := store.Create(initial)
 
@@ -728,6 +756,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Initial",
 			Notifiers:       []string{"logger://"},
 			CheckInInterval: "24h",
+			Status:          &statusActive,
 		}
 		created, _ := store.Create(initial)
 
@@ -760,6 +789,7 @@ func TestPutSwitchId(t *testing.T) {
 			Message:         "Initial",
 			Notifiers:       []string{"logger://"},
 			CheckInInterval: "24h",
+			Status:          &statusActive,
 		}
 		created, _ := store.Create(initial)
 
@@ -796,6 +826,7 @@ func TestDeleteHandleFunc(t *testing.T) {
 		Message:         "Delete Me",
 		Notifiers:       []string{"logger://"},
 		CheckInInterval: "1h",
+		Status:          &statusActive,
 	})
 	if err != nil {
 		t.Fatalf("failed to seed switch: %v", err)
@@ -838,25 +869,26 @@ func TestResetHandleFunc(t *testing.T) {
 	s, store := setupTestHandler(t)
 	checkInInterval := "12h"
 	expectedInterval := 12 * time.Hour
-
 	sw, err := store.Create(api.Switch{
 		Message:         "Reset Me",
 		Notifiers:       []string{"logger://"},
 		CheckInInterval: checkInInterval,
+		Status:          &statusActive,
 	})
 	if err != nil {
 		t.Fatalf("failed to seed switch: %v", err)
 	}
 
-	_, err = s.Store.Sent(*sw.Id)
+	sw.Status = &statusTriggered
+	_, err = s.Store.Update(*sw.Id, sw)
 	if err != nil {
-		t.Fatalf("failed to marks switch as sent: %v", err)
+		t.Fatalf("failed to marks switch as triggered: %v", err)
 	}
 
 	t.Run("successfully resets a switch timer and statuses", func(t *testing.T) {
 		// Calculate the expected Unix timestamp based on Now
 		now := time.Now().Unix()
-		expectedSendAt := now + int64(expectedInterval.Seconds())
+		expectedTriggerAt := now + int64(expectedInterval.Seconds())
 
 		// Allow for a small window of time (e.g., 5 seconds) due to processing delay
 		delta := int64(5)
@@ -879,23 +911,18 @@ func TestResetHandleFunc(t *testing.T) {
 		}
 
 		// Verify reminderSent status is now false
-		if resp.Disabled != nil && *resp.Disabled {
-			t.Error("expected disabled to be false after reset")
-		}
-
-		// Verify reminderSent status is now false
-		if resp.Sent != nil && *resp.ReminderSent {
+		if resp.ReminderSent != nil && *resp.ReminderSent {
 			t.Error("expected reminderSent to be false after reset")
 		}
 
-		// Verify sent status is now false
-		if resp.Sent != nil && *resp.Sent {
-			t.Error("expected switch to be false after reset")
+		// Verify active status
+		if *resp.Status != api.SwitchStatusActive {
+			t.Error("expected switch to be active after reset")
 		}
 
-		if *resp.SendAt < (expectedSendAt-delta) || *resp.SendAt > (expectedSendAt+delta) {
-			t.Errorf("expected SendAt to be approx %d (12h from now), but got %d (diff: %ds)",
-				expectedSendAt, *resp.SendAt, *resp.SendAt-expectedSendAt)
+		if *resp.TriggerAt < (expectedTriggerAt-delta) || *resp.TriggerAt > (expectedTriggerAt+delta) {
+			t.Errorf("expected TriggerAt to be approx %d (12h from now), but got %d (diff: %ds)",
+				expectedTriggerAt, *resp.TriggerAt, *resp.TriggerAt-expectedTriggerAt)
 		}
 	})
 
@@ -912,14 +939,13 @@ func TestResetHandleFunc(t *testing.T) {
 		}
 	})
 
-	t.Run("reset enables a disabled/sent switch", func(t *testing.T) {
+	t.Run("reset enables a disabled/triggered switch", func(t *testing.T) {
 		disabledSw, err := store.Create(api.Switch{
 			Message:         "Reset Me",
 			Notifiers:       []string{"logger://"},
 			CheckInInterval: "1h",
-			Disabled:        ptr(true),
 			ReminderSent:    ptr(true),
-			Sent:            ptr(true),
+			Status:          &statusDisabled,
 		})
 		if err != nil {
 			t.Fatalf("failed to seed switch: %v", err)
@@ -941,19 +967,14 @@ func TestResetHandleFunc(t *testing.T) {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		// Verify not Disabled
-		if *resp.Disabled {
-			t.Error("expected disabled to be false after reset")
-		}
-
 		// Verify no ReminderSent
 		if *resp.ReminderSent {
 			t.Error("expected reminderSent to be false after reset")
 		}
 
-		// Verify not Sent
-		if *resp.Sent {
-			t.Error("expected sent to be false after reset")
+		// Verify not triggered
+		if *resp.Status != api.SwitchStatusActive {
+			t.Error("expected status to be active after reset")
 		}
 	})
 }
@@ -966,6 +987,7 @@ func TestDisableHandleFunc(t *testing.T) {
 		Message:         "Disable Me",
 		Notifiers:       []string{"logger://"},
 		CheckInInterval: "1h",
+		Status:          &statusActive,
 	})
 	if err != nil {
 		t.Fatalf("failed to create switch: %v", err)
@@ -989,19 +1011,9 @@ func TestDisableHandleFunc(t *testing.T) {
 			t.Fatalf("failed to decode response: %v", err)
 		}
 
-		// Verify disabled status is now true
-		if !*resp.Disabled {
+		// Verify disabled status is now true\
+		if *resp.Status != api.SwitchStatusDisabled {
 			t.Error("expected switch to be disabled in response")
-		}
-
-		// Double check the database state
-		dbSwitch, err := store.GetByID(*sw.Id)
-		if err != nil {
-			t.Fatalf("failed to get switch by id: %v", err)
-		}
-
-		if !*dbSwitch.Disabled {
-			t.Error("expected switch to be disabled in database")
 		}
 	})
 

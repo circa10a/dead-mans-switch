@@ -8,6 +8,8 @@ import (
 	"github.com/circa10a/dead-mans-switch/api"
 )
 
+var statusActive = api.SwitchStatusActive
+
 func setupTestStore(t *testing.T) Store {
 	t.Helper()
 	dbPath := t.TempDir()
@@ -26,11 +28,12 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 	store := setupTestStore(t)
 	oneHourLater := time.Now().Add(time.Hour).Unix()
 	sw := api.Switch{
-		Message:         "Test Message",
-		Notifiers:       []string{"logger://"},
-		CheckInInterval: "1h",
-		DeleteAfterSent: ptr(false),
-		SendAt:          &oneHourLater,
+		Message:              "Test Message",
+		Notifiers:            []string{"logger://"},
+		CheckInInterval:      "1h",
+		DeleteAfterTriggered: ptr(false),
+		TriggerAt:            &oneHourLater,
+		Status:               &statusActive,
 	}
 
 	t.Run("Create and GetByID", func(t *testing.T) {
@@ -81,7 +84,8 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 			Notifiers:       []string{"n1"},
 			CheckInInterval: "1h",
 			Encrypted:       ptr(true),
-			SendAt:          &oneHourLater,
+			TriggerAt:       &oneHourLater,
+			Status:          &statusActive,
 		}
 
 		// Store.Create internally calls EncryptSwitch
@@ -112,7 +116,8 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 			CheckInInterval:   "1h",
 			ReminderEnabled:   ptr(true),
 			ReminderThreshold: ptr("15m"),
-			SendAt:            &oneHourLater,
+			TriggerAt:         &oneHourLater,
+			Status:            &statusActive,
 		}
 
 		created, err := store.Create(sw)
@@ -137,7 +142,8 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 			CheckInInterval:   "1h",
 			ReminderEnabled:   ptr(true),
 			ReminderThreshold: ptr("10m"),
-			SendAt:            &oneSecondAgo, // Expired
+			TriggerAt:         &oneSecondAgo, // Expired
+			Status:            &statusActive,
 		}
 
 		created, err := store.Create(sw)
@@ -172,7 +178,7 @@ func TestSQLiteStore_Reminders(t *testing.T) {
 		}
 		for _, s := range eligible {
 			if *s.Id == *created.Id {
-				t.Error("switch still showing as eligible after being marked sent")
+				t.Error("switch still showing as eligible after being marked triggered")
 			}
 		}
 	})
@@ -195,7 +201,8 @@ func TestSQLiteStore_StatusAndExpirations(t *testing.T) {
 			PushSubscription: &api.PushSubscription{
 				Endpoint: ptr(pushEndpoint),
 			},
-			SendAt: &tenSecondsAgo,
+			TriggerAt: &tenSecondsAgo,
+			Status:    &statusActive,
 		}
 
 		created, err := store.Create(sw)

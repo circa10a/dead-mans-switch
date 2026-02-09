@@ -5,13 +5,13 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(self.clients.claim());
 });
+
 self.addEventListener('push', (event) => {
+    let data; // Define data in scope
     if (event.data) {
         try {
-            // Try to parse as JSON
             data = event.data.json();
         } catch (e) {
-            // If it's not JSON (like your DevTools test), use the raw text as the body
             data = {
                 title: 'Notification',
                 body: event.data.text(),
@@ -39,29 +39,31 @@ self.addEventListener('push', (event) => {
     );
 });
 
-// Merged single listener for all clicks
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     const switchId = event.notification.data?.id;
 
-    // Handle the "Check In" button specifically
     if (event.action === 'checkin' && switchId) {
         event.waitUntil(
-
+            // The API change doesn't break this endpoint, 
+            // but we call it to move status from 'active' back to a full timer
             fetch(`/api/v1/switch/${switchId}/reset`, {
-                method: 'POST'
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+                // Note: We don't send the pushSubscription here because 
+                // the SW doesn't have easy access to it, and the server 
+                // should retain the existing one if not provided.
             }).then(response => {
                 if (response.ok) {
-                    return self.registration.showNotification('Switch Reset', {
-                        body: 'Checked In Successfully',
-                        icon: '/icon.png',
-                        tag: 'reset-success' // Overwrites previous alerts
+                    return self.registration.showNotification('Checked In', {
+                        body: 'The switch timer has been reset.',
+                        icon: '/images/purple-skull-512-maskable-square.png',
+                        tag: 'reset-success'
                     });
                 }
             }).catch(err => console.error("Check-in fetch failed:", err))
         );
     } 
-    // Handle tapping the notification body
     else {
         event.waitUntil(
             clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

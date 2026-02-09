@@ -79,7 +79,11 @@ func dumpResponse(cmd *cobra.Command, statusCode int, body []byte, successData i
 		} else {
 			// Success but no data (e.g., 204 No Content)
 			if useColor {
-				color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Success")
+				_, err := color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Success")
+				if err != nil {
+					cmd.PrintErrf("Error writing to stdout %v\n", err)
+					return
+				}
 			} else {
 				cmd.Println("Success")
 			}
@@ -153,14 +157,14 @@ var createSwitchCmd = &cobra.Command{
 		interval, _ := cmd.Flags().GetDuration("interval")
 		notifiers, _ := cmd.Flags().GetStringArray("notifiers")
 		encrypt, _ := cmd.Flags().GetBool("encrypt")
-		deleteAfter, _ := cmd.Flags().GetBool("delete-after-sent")
+		deleteAfter, _ := cmd.Flags().GetBool("delete-after-triggered")
 
 		body := api.PostSwitchJSONRequestBody{
-			Message:         msg,
-			CheckInInterval: interval.String(),
-			Notifiers:       notifiers,
-			Encrypted:       &encrypt,
-			DeleteAfterSent: &deleteAfter,
+			Message:              msg,
+			CheckInInterval:      interval.String(),
+			Notifiers:            notifiers,
+			Encrypted:            &encrypt,
+			DeleteAfterTriggered: &deleteAfter,
 		}
 
 		resp, err := client.PostSwitchWithResponse(context.Background(), body)
@@ -197,14 +201,14 @@ var updateSwitchCmd = &cobra.Command{
 		msg, _ := cmd.Flags().GetString("message")
 		interval, _ := cmd.Flags().GetDuration("interval")
 		notifiers, _ := cmd.Flags().GetStringArray("notifiers")
-		deleteAfter, _ := cmd.Flags().GetBool("delete-after-sent")
+		deleteAfter, _ := cmd.Flags().GetBool("delete-after-triggered")
 
 		body := api.PutSwitchIdJSONRequestBody{
-			Message:         existing.JSON200.Message,
-			CheckInInterval: existing.JSON200.CheckInInterval,
-			Notifiers:       existing.JSON200.Notifiers,
-			DeleteAfterSent: existing.JSON200.DeleteAfterSent,
-			Encrypted:       existing.JSON200.Encrypted,
+			Message:              existing.JSON200.Message,
+			CheckInInterval:      existing.JSON200.CheckInInterval,
+			Notifiers:            existing.JSON200.Notifiers,
+			DeleteAfterTriggered: existing.JSON200.DeleteAfterTriggered,
+			Encrypted:            existing.JSON200.Encrypted,
 		}
 
 		if cmd.Flags().Changed("message") {
@@ -216,8 +220,8 @@ var updateSwitchCmd = &cobra.Command{
 		if cmd.Flags().Changed("notifiers") {
 			body.Notifiers = notifiers
 		}
-		if cmd.Flags().Changed("delete-after-sent") {
-			body.DeleteAfterSent = &deleteAfter
+		if cmd.Flags().Changed("delete-after-triggered") {
+			body.DeleteAfterTriggered = &deleteAfter
 		}
 
 		resp, err := client.PutSwitchIdWithResponse(ctx, id, body)
@@ -277,7 +281,7 @@ func init() {
 		c.Flags().StringP("message", "m", "", "Message")
 		c.Flags().DurationP("interval", "i", time.Hour*24, "Check-in interval (e.g. 1h, 30m)")
 		c.Flags().StringArrayP("notifiers", "n", []string{}, "Notifier URLs")
-		c.Flags().BoolP("delete-after-sent", "d", false, "Delete switch after notification is sent")
+		c.Flags().BoolP("delete-after-triggered", "d", false, "Delete switch after notification is triggered")
 	}
 
 	createSwitchCmd.Flags().BoolP("encrypt", "e", false, "Encrypt notifiers/message")

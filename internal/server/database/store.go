@@ -16,7 +16,7 @@ type Store interface {
 	GetAll(limit int) ([]api.Switch, error)
 	// GetByID retrieves a single switch by its unique identifier.
 	GetByID(id int) (api.Switch, error)
-	// GetExpired retrieves switches whose send_at time has passed but haven't been sent.
+	// GetExpired retrieves switches whose trigger_at time has passed but haven't been sent.
 	GetExpired(limit int) ([]api.Switch, error)
 	// GetEligibleReminders retrieves switches that are approaching expiry but haven't had a PWA reminder sent yet.
 	GetEligibleReminders(limit int) ([]api.Switch, error)
@@ -26,8 +26,6 @@ type Store interface {
 	Delete(id int) error
 	// ReminderSent flags a switch so the PWA reminder isn't sent repeatedly in the same cycle.
 	ReminderSent(id int) (api.Switch, error)
-	// Sent marks a specific switch as having been processed/sent.
-	Sent(id int) (api.Switch, error)
 	// Encrypt encrypts sensitive content.
 	EncryptSwitch(*api.Switch) error
 	// Decrypt encrypts sensitive content.

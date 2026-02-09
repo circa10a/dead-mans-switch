@@ -18,8 +18,16 @@ import (
 
 // Defines values for HealthStatus.
 const (
-	Failed HealthStatus = "failed"
-	Ok     HealthStatus = "ok"
+	HealthStatusFailed HealthStatus = "failed"
+	HealthStatusOk     HealthStatus = "ok"
+)
+
+// Defines values for SwitchStatus.
+const (
+	SwitchStatusActive    SwitchStatus = "active"
+	SwitchStatusDisabled  SwitchStatus = "disabled"
+	SwitchStatusFailed    SwitchStatus = "failed"
+	SwitchStatusTriggered SwitchStatus = "triggered"
 )
 
 // Error Includes http status code and reason for error
@@ -50,11 +58,8 @@ type Switch struct {
 	// CheckInInterval Timer countdown until a switch is triggered
 	CheckInInterval string `json:"checkInInterval" validate:"required"`
 
-	// DeleteAfterSent Whether to delete the switch after sending
-	DeleteAfterSent *bool `json:"deleteAfterSent,omitempty"`
-
-	// Disabled Disable the switch
-	Disabled *bool `json:"disabled,omitempty"`
+	// DeleteAfterTriggered Whether to delete the switch after triggering
+	DeleteAfterTriggered *bool `json:"deleteAfterTriggered,omitempty"`
 
 	// Encrypted Where or not to encrypt switch data. Data will no longer be readable via the API
 	Encrypted *bool `json:"encrypted,omitempty"`
@@ -72,18 +77,21 @@ type Switch struct {
 	// ReminderEnabled If push notifications have been configured
 	ReminderEnabled *bool `json:"reminderEnabled,omitempty"`
 
-	// ReminderSent If push notifications have been sent
+	// ReminderSent If push notifications have been triggered
 	ReminderSent *bool `json:"reminderSent,omitempty"`
 
 	// ReminderThreshold How long before expiration to send a push notification
 	ReminderThreshold *string `json:"reminderThreshold,omitempty"`
 
-	// SendAt Time to send in Unix time format to trigger switch
-	SendAt *int64 `json:"sendAt,omitempty"`
+	// Status Current switch status
+	Status *SwitchStatus `json:"status,omitempty"`
 
-	// Sent If switch notifiers have been triggered
-	Sent *bool `json:"sent,omitempty"`
+	// TriggerAt Time to trigger in Unix time format to trigger switch
+	TriggerAt *int64 `json:"triggerAt,omitempty"`
 }
+
+// SwitchStatus Current switch status
+type SwitchStatus string
 
 // GetSwitchParams defines parameters for GetSwitch.
 type GetSwitchParams struct {

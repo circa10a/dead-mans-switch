@@ -50,9 +50,14 @@ func (s *Switch) PostHandleFunc(w http.ResponseWriter, r *http.Request) {
 		s.sendError(w, http.StatusBadRequest, errTimeParse, err)
 		return
 	}
+
+	// Set as active
+	statusActive := api.SwitchStatusActive
+	payload.Status = &statusActive
+
 	// Compute time at which to send
-	sendAt := time.Now().Add(duration).Unix()
-	payload.SendAt = &sendAt
+	TriggerAt := time.Now().Add(duration).Unix()
+	payload.TriggerAt = &TriggerAt
 
 	// If push subscription and threshold defined, set reminderEnabled to true
 	reminderEnabled := payload.PushSubscription != nil && payload.ReminderThreshold != nil && *payload.ReminderThreshold != ""
@@ -151,17 +156,17 @@ func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Keep existing send time
-	payload.SendAt = previousSwitch.SendAt
+	payload.TriggerAt = previousSwitch.TriggerAt
 
 	// Change send time if checkInInterval changed
 	if previousSwitch.CheckInInterval != payload.CheckInInterval {
 		duration, err := time.ParseDuration(payload.CheckInInterval)
 		if err != nil {
-			s.sendError(w, http.StatusBadRequest, errInvalidSwitchID, err)
+			s.sendError(w, http.StatusBadRequest, "Invalid checkInInterval time format. Examples are 10s, 10m, 10h, 10d", err)
 			return
 		}
-		updatedSendAt := time.Now().Add(duration).Unix()
-		payload.SendAt = &updatedSendAt
+		updatedTriggerAt := time.Now().Add(duration).Unix()
+		payload.TriggerAt = &updatedTriggerAt
 	}
 
 	// If push subscription and threshold defined, set reminderEnabled to true
@@ -221,11 +226,6 @@ func (s *Switch) ResetHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		PushSubscription *api.PushSubscription `json:"pushSubscription"`
-	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
-
 	switchToReset, err := s.Store.GetByID(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -242,14 +242,18 @@ func (s *Switch) ResetHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update sendAt time
-	newSendAt := time.Now().UTC().Add(duration).Unix()
-	switchToReset.SendAt = &newSendAt
+	// Update status to active
+	statusActive := api.SwitchStatusActive
+	switchToReset.Status = &statusActive
+
+	// Update TriggerAt time
+	newTriggerAt := time.Now().UTC().Add(duration).Unix()
+	switchToReset.TriggerAt = &newTriggerAt
 
 	// Set default values to false
 	defaultOff := false
-	switchToReset.Disabled = &defaultOff
-	switchToReset.Sent = &defaultOff
+	defaultStatus := api.SwitchStatusActive
+	switchToReset.Status = &defaultStatus
 	switchToReset.ReminderSent = &defaultOff
 
 	resetSwitch, err := s.Store.Update(id, switchToReset)
@@ -284,8 +288,8 @@ func (s *Switch) DisableHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := true
-	switchToDisable.Disabled = &v
+	statusDisabled := api.SwitchStatusDisabled
+	switchToDisable.Status = &statusDisabled
 
 	disabledSwitch, err := s.Store.Update(id, switchToDisable)
 	if err != nil {
@@ -327,5 +331,6 @@ func (s *Switch) redactAll(switches []api.Switch) []api.Switch {
 	for i, sw := range switches {
 		redacted[i] = s.redact(sw)
 	}
+
 	return redacted
 }

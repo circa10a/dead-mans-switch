@@ -101,8 +101,8 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 		}
 	}
 
-	if *sw.DeleteAfterSent {
-		w.Logger.Debug("Auto-deleting switch after sending", "id", *sw.Id)
+	if *sw.DeleteAfterTriggered {
+		w.Logger.Debug("Auto-deleting switch after triggering", "id", *sw.Id)
 		err = w.Store.Delete(*sw.Id)
 		if err != nil {
 			return err
@@ -110,8 +110,10 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 		return nil
 	}
 
-	w.Logger.Debug("Marking switch as sent", "id", *sw.Id)
-	_, err = w.Store.Sent(*sw.Id)
+	w.Logger.Debug("Marking switch as triggered", "id", *sw.Id)
+	statusTriggered := api.SwitchStatusTriggered
+	sw.Status = &statusTriggered
+	_, err = w.Store.Update(*sw.Id, sw)
 	if err != nil {
 		return err
 	}
@@ -125,8 +127,8 @@ func (w *Worker) processReminder(sw api.Switch) error {
 		return nil
 	}
 
-	if sw.SendAt == nil {
-		return errors.New("sentAt should not be nil")
+	if sw.TriggerAt == nil {
+		return errors.New("triggerAt should not be nil")
 	}
 
 	reminderDur, err := time.ParseDuration(*sw.ReminderThreshold)
@@ -136,14 +138,14 @@ func (w *Worker) processReminder(sw api.Switch) error {
 
 	now := time.Now().Unix()
 
-	// SendAt is a Unix timestamp (integer)
+	// TriggerAt is a Unix timestamp (integer)
 	// reminderDur.Seconds() gives us the threshold in seconds
-	thresholdTime := *sw.SendAt - int64(reminderDur.Seconds())
+	thresholdTime := *sw.TriggerAt - int64(reminderDur.Seconds())
 
 	w.Logger.Debug("Evaluating reminder eligibility",
 		"id", *sw.Id,
 		"threshold", time.Unix(thresholdTime, 0).Format(time.RFC3339),
-		"sendAt", time.Unix(*sw.SendAt, 0).Format(time.RFC3339),
+		"TriggerAt", time.Unix(*sw.TriggerAt, 0).Format(time.RFC3339),
 	)
 
 	// If we are past the threshold AND the switch hasn't actually expired yet
@@ -151,7 +153,7 @@ func (w *Worker) processReminder(sw api.Switch) error {
 		w.Logger.Debug("Reminder threshold met, triggering web push", "id", *sw.Id)
 
 		// Calculate time string for the message
-		diff := *sw.SendAt - now
+		diff := *sw.TriggerAt - now
 		remaining := time.Duration(diff) * time.Second
 		remainingStr := remaining.Round(time.Second).String()
 

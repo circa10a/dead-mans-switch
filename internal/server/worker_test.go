@@ -53,11 +53,10 @@ func (m *MockStore) ReminderSent(id int) (api.Switch, error) {
 	}
 	return api.Switch{}, nil
 }
-func (m *MockStore) Sent(id int) (api.Switch, error) {
-	m.SentCalled = true
-	return api.Switch{}, m.SentFunc(id)
-}
 func (m *MockStore) Update(id int, sw api.Switch) (api.Switch, error) {
+	if *sw.Status == api.SwitchStatusTriggered {
+		m.SentCalled = true
+	}
 	return sw, nil
 }
 func (m *MockStore) Delete(id int) error {
@@ -82,14 +81,14 @@ func TestWorker_Sweep_Success(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	validNotifier := "logger://"
 
-	t.Run("should mark as sent on success when DeleteAfterSent is false", func(t *testing.T) {
+	t.Run("should mark as triggered on success when DeleteAfterTriggered is false", func(t *testing.T) {
 		mock := &MockStore{
 			GetExpiredFunc: func(limit int) ([]api.Switch, error) {
 				return []api.Switch{{
-					Id:              &testID,
-					Message:         "hello",
-					Notifiers:       []string{validNotifier},
-					DeleteAfterSent: ptr(false),
+					Id:                   &testID,
+					Message:              "hello",
+					Notifiers:            []string{validNotifier},
+					DeleteAfterTriggered: ptr(false),
 				}}, nil
 			},
 			SentFunc: func(id int) error { return nil },
@@ -107,20 +106,20 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 	testID := 456
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	// Helper to setup a switch with a specific SendAt time
-	createReminderSwitch := func(sendAt *int64) api.Switch {
+	// Helper to setup a switch with a specific TriggerAt time
+	createReminderSwitch := func(TriggerAt *int64) api.Switch {
 		return api.Switch{
 			Id:                &testID,
 			Message:           "reminder",
 			ReminderThreshold: ptr("15m"),
-			SendAt:            sendAt,
+			TriggerAt:         TriggerAt,
 			PushSubscription: &api.PushSubscription{
 				Endpoint: ptr("https://fcm.googleapis.com/test"),
 			},
 		}
 	}
 
-	t.Run("should send reminder and mark as sent when inside window", func(t *testing.T) {
+	t.Run("should send reminder and mark as triggered when inside window", func(t *testing.T) {
 		// Switch expires in 10 minutes, reminder is set for 15 minutes -> We are in the window
 		expiringSoon := time.Now().Add(10 * time.Minute).Unix()
 
@@ -170,10 +169,10 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 		mock := &MockStore{
 			GetExpiredFunc: func(limit int) ([]api.Switch, error) {
 				return []api.Switch{{
-					Id:              &testID,
-					Message:         "fault tolerance test",
-					Notifiers:       []string{"invalid://scheme", "logger://"},
-					DeleteAfterSent: ptr(false),
+					Id:                   &testID,
+					Message:              "fault tolerance test",
+					Notifiers:            []string{"invalid://scheme", "logger://"},
+					DeleteAfterTriggered: ptr(false),
 				}}, nil
 			},
 			SentFunc: func(id int) error { return nil },
@@ -184,7 +183,7 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 
 		// Because one notifier failed, the aggregate error should have prevented
 		// the database from being updated to "Sent".
-		assert.False(t, mock.SentCalled, "Should not mark as sent if any notifier in the list fails")
+		assert.False(t, mock.SentCalled, "Should not mark as triggered if any notifier in the list fails")
 	})
 }
 

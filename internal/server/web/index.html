@@ -155,22 +155,22 @@
         <div class="space-y-4">
             <template x-for="sw in switches" :key="sw.id">
                 <div class="glass border border-gray-200 dark:border-white/5 rounded-2xl p-5 shadow-sm dark:shadow-2xl relative overflow-hidden group transition-all duration-500"
-                    :class="sw.disabled ? 'disabled-card-container' : ''">
+                    :class="sw.status === 'disabled' ? 'disabled-card-container' : ''">
 
-                    <div :class="sw.disabled ? '' : (sw.sent ? 'bg-red-500/10' : (isPending(sw) ? 'bg-amber-500/20 animate-pulse' : (isExpiringSoon(sw.sendAt) ? 'bg-orange-500/20 animate-pulse' : 'bg-emerald-500/5')))"
+                    <div :class="sw.status === 'disabled' ? '' : (sw.status === 'triggered' || sw.status === 'failed' ? 'bg-red-500/10' : (isPending(sw) ? 'bg-amber-500/20 animate-pulse' : (isExpiringSoon(sw.triggerAt) ? 'bg-orange-500/20 animate-pulse' : 'bg-emerald-500/5')))"
                         class="absolute inset-0 pointer-events-none transition-colors duration-1000"></div>
 
                     <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
                             <div class="flex items-center gap-2">
                                 <span
-                                    :class="sw.disabled ? 'text-gray-500 bg-gray-500/10 border-gray-500/20' : 
-                                    (sw.sent || isStuck(sw) ? 'text-red-500 dark:text-red-400 bg-red-500/10 dark:bg-red-400/10 border-red-500/20 dark:border-red-400/20' : 
+                                    :class="sw.status === 'disabled' ? 'text-gray-500 bg-gray-500/10 border-gray-500/20' : 
+                                    (sw.status === 'triggered' || sw.status === 'failed' ? 'text-red-500 dark:text-red-400 bg-red-500/10 dark:bg-red-400/10 border-red-500/20 dark:border-red-400/20' : 
                                     (isPending(sw) ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-400/10 border-amber-500/20 dark:border-amber-400/20' : 
-                                    (isExpiringSoon(sw.sendAt) ? 'text-orange-600 dark:text-orange-400 bg-orange-500/10 dark:bg-orange-400/10 border-orange-500/20 dark:border-orange-400/20' : 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-400/10 border-emerald-500/20 dark:border-emerald-400/20')))"
+                                    (isExpiringSoon(sw.triggerAt) ? 'text-orange-600 dark:text-orange-400 bg-orange-500/10 dark:bg-orange-400/10 border-orange-500/20 dark:border-orange-400/20' : 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-400/10 border-emerald-500/20 dark:border-emerald-400/20')))"
                                     class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border"
-                                    :class="isStuck(sw) ? 'animate-pulse ring-1 ring-red-500/50' : ''"
-                                    x-text="sw.disabled ? 'Paused' : (sw.sent ? 'Triggered' : (isStuck(sw) ? 'Stuck' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.sendAt) ? 'Soon' : 'Active'))))">
+                                    :class="sw.status === 'failed' ? 'animate-pulse ring-1 ring-red-500/50' : ''"
+                                    x-text="sw.status === 'disabled' ? 'Paused' : (sw.status === 'triggered' ? 'Triggered' : (sw.status === 'failed' ? 'Failed' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.triggerAt) ? 'Soon' : 'Active'))))">
                                 </span>
 
                                 <template x-if="isReminderEnabled(sw)">
@@ -184,7 +184,7 @@
                                 </template>
                             </div>
                             <div class="flex gap-2">
-                                <button x-show="!sw.disabled" @click="disableSw(sw.id)"
+                                <button x-show="sw.status !== 'disabled'" @click="disableSw(sw.id)"
                                     class="p-2 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
                                     title="Pause Switch">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,7 +209,7 @@
                             </div>
                         </div>
 
-                        <div :class="sw.disabled ? 'opacity-40 grayscale' : ''">
+                        <div :class="sw.status === 'disabled' ? 'opacity-40 grayscale' : ''">
                             <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1 truncate"
                                 x-text="sw.encrypted ? '••••••••' : sw.message"></h2>
 
@@ -229,24 +229,24 @@
                                 </div>
                                 <div class="text-right"><span
                                         class="text-[10px] text-gray-500 uppercase font-bold">Remaining</span><span
-                                        :class="sw.disabled ? 'text-gray-500' : (sw.sent ? 'text-red-500' : (isPending(sw) ? 'text-amber-500 dark:text-amber-400' : (isExpiringSoon(sw.sendAt) ? 'text-orange-500 dark:text-orange-400' : 'text-indigo-600 dark:text-indigo-400')))"
+                                        :class="sw.status === 'disabled' ? 'text-gray-500' : (sw.status === 'triggered' || sw.status === 'failed' ? 'text-red-500' : (isPending(sw) ? 'text-amber-500 dark:text-amber-400' : (isExpiringSoon(sw.triggerAt) ? 'text-orange-500 dark:text-orange-400' : 'text-indigo-600 dark:text-indigo-400')))"
                                         class="text-sm font-mono font-bold block"
-                                        x-text="sw.disabled ? 'PAUSED' : (sw.sent ? 'STOPPED' : getCountdown(sw.sendAt))"></span>
+                                        x-text="sw.status === 'disabled' ? 'PAUSED' : (sw.status === 'triggered' ? 'TRIGGERED' : (sw.status === 'failed' ? 'FAILED' : getCountdown(sw.triggerAt)))"></span>
                                 </div>
                             </div>
                         </div>
 
                         <div class="pt-4 border-t border-gray-200 dark:border-white/5 mt-4">
                             <button @click="resetSw(sw.id)" :disabled="resettingId === sw.id"
-                                :class="resettingId === sw.id ? 'bg-emerald-500 text-black border-emerald-500 scale-[0.97]' : (sw.disabled ? 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/20')"
+                                :class="resettingId === sw.id ? 'bg-emerald-500 text-black border-emerald-500 scale-[0.97]' : (sw.status === 'disabled' ? 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/20')"
                                 class="w-full py-4 border text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden relative active:scale-95">
                                 <span x-show="resettingId !== sw.id"
-                                    x-text="sw.disabled ? 'Enable' : 'Check In'"></span>
+                                    x-text="(sw.status === 'disabled' || sw.status === 'triggered' ) ? 'Enable' : 'Check In'"></span>
                                 <span x-show="resettingId === sw.id" class="flex items-center gap-2"><svg
                                         class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
                                         <path d="M5 13l4 4L19 7" stroke-width="3" stroke-linecap="round"></path>
-                                    </svg> <span x-text="sw.disabled ? 'Enabled' : 'Checked In'"></span></span>
+                                    </svg> <span x-text="sw.status === 'disabled' ? 'Enabled' : 'Checked In'"></span></span>
                             </button>
                         </div>
                     </div>
@@ -333,7 +333,7 @@
                     </div>
 
                     <div class="flex gap-4">
-                        <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.deleteAfterSent"
+                        <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.deleteAfterTriggered"
                                 type="checkbox" class="rounded bg-gray-200 dark:bg-white/5 text-indigo-500 border-gray-300 dark:border-transparent"><span
                                 class="text-[10px] text-gray-500 dark:text-gray-400">Auto-Delete</span></label>
                         <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.encrypted"
@@ -372,7 +372,7 @@
                     message: '',
                     checkInInterval: '24h',
                     notifiersStr: '',
-                    deleteAfterSent: false,
+                    deleteAfterTriggered: false,
                     encrypted: false,
                     reminderEnabled: false, 
                     reminderThreshold: '',
@@ -464,14 +464,7 @@
                 },
 
                 isReminderEnabled(sw) {
-                    return sw.reminderEnabled && !sw.disabled;
-                },
-
-               isStuck(sw) {
-                    if (sw.sent || sw.disabled) return false;
-                    const oneHourInMs = 60 * 60 * 1000;
-                    // Multiply by 1000 to convert Unix seconds to JS milliseconds
-                    return (this.now - (sw.sendAt * 1000)) > oneHourInMs;
+                    return sw.reminderEnabled && sw.status !== 'disabled';
                 },
 
                isExpiringSoon(deadline) {
@@ -482,7 +475,7 @@
 
                isPending(sw) {
                     // Compare Unix seconds * 1000
-                    return !sw.sent && !sw.disabled && (sw.sendAt * 1000 - this.now) <= 0;
+                    return sw.status === 'active' && (sw.triggerAt * 1000 - this.now) <= 0;
                 },
 
                 getCountdown(deadline) {
@@ -524,7 +517,7 @@
                         message: '',
                         checkInInterval: '24h',
                         notifiersStr: '',
-                        deleteAfterSent: false,
+                        deleteAfterTriggered: false,
                         encrypted: false,
                         reminderThreshold: '',
                         reminderIndex: 0,
