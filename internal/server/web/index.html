@@ -29,8 +29,9 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
+        /* Deep nocturnal background */
         .dark body {
-            background-color: #0a0a0a;
+            background-color: #050505;
         }
 
         .glass {
@@ -39,8 +40,9 @@
             -webkit-backdrop-filter: blur(12px);
         }
 
+        /* Opaque charcoal glass for better contrast */
         .dark .glass {
-            background: rgba(23, 23, 23, 0.8);
+            background: rgba(15, 15, 15, 0.9);
         }
 
         .disabled-card-container {
@@ -49,8 +51,8 @@
         }
 
         .dark .disabled-card-container {
-            background: rgba(255, 255, 255, 0.02) !important;
-            border-color: rgba(255, 255, 255, 0.05) !important;
+            background: rgba(255, 255, 255, 0.01) !important;
+            border-color: rgba(255, 255, 255, 0.03) !important;
         }
 
         input[type=range]::-webkit-slider-runnable-track {
@@ -60,7 +62,7 @@
         }
 
         .dark input[type=range]::-webkit-slider-runnable-track {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         input[type=range]::-webkit-slider-thumb {
@@ -75,7 +77,6 @@
         }
     </style>
     <script>
-        // Check local storage or system preference on load to avoid FOUC
         if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark')
         } else {
@@ -84,7 +85,7 @@
     </script>
 </head>
 
-<body class="text-gray-900 dark:text-gray-100 antialiased" x-data="app()">
+<body class="text-gray-900 dark:text-gray-300 antialiased" x-data="app()">
     <template x-if="!isSecure && showInsecureWarning">
         <div
             class="bg-amber-500 text-black px-4 py-2 text-[10px] font-bold uppercase tracking-widest flex justify-between items-center z-[60] relative">
@@ -97,13 +98,13 @@
         x-transition:enter-start="-translate-y-full" x-transition:enter-end="translate-y-0"
         x-transition:leave="transition ease-in duration-200" x-transition:leave-start="translate-y-0"
         x-transition:leave-end="-translate-y-full"
-        class="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em] py-3 text-center shadow-lg border-b border-red-500">
+        class="fixed top-0 left-0 right-0 z-[100] bg-red-700 text-white text-[10px] font-black uppercase tracking-[0.2em] py-3 text-center shadow-lg border-b border-red-900">
         <div class="flex items-center justify-center gap-2">
             <span class="relative flex h-2 w-2">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
             </span>
-            Connection Lost — Attempting to Reconnect
+            Connection Lost — Reconnecting
         </div>
     </div>
 
@@ -111,41 +112,39 @@
         <div class="max-w-3xl mx-auto px-6 h-16 flex justify-between items-center">
             <div class="flex items-center gap-3">
                 <div
-                    class="w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    class="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg shadow-indigo-900/40">
                     <img src="/images/purple-skull-512-rounded.png" alt="App Icon" class="w-5 h-5 object-contain">
                 </div>
-                <h1 class="font-medium text-lg tracking-tight text-gray-900 dark:text-gray-100">Dead Man's Switch</h1>
+                <h1 class="font-bold text-lg tracking-tight text-gray-900 dark:text-white/90">Dead Man's Switch</h1>
             </div>
             <div class="flex items-center gap-3">
-                
-                <button type="button" 
-                    @click="toggleTheme()" 
-                    class="p-2 rounded-full transition-all text-gray-500 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/10 active:scale-95 flex items-center justify-center"
-                    title="Toggle Dark Mode">
-                    
+                <button type="button" @click="toggleTheme()"
+                    class="p-2 rounded-full transition-all text-gray-500 hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5 active:scale-95 flex items-center justify-center">
                     <svg x-show="!darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
-
-                    <svg x-show="darkMode" x-cloak class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    <svg x-show="darkMode" x-cloak class="w-5 h-5" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
                 </button>
 
                 <button @click="forcePermission()" class="p-2 rounded-full transition-all active:scale-95" :class="{
-                        'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 animate-pulse cursor-pointer': notifyStatus === 'default',
-                        'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10': notifyStatus === 'granted',
-                        'text-gray-500 dark:text-gray-600 bg-black/5 dark:bg-white/5': notifyStatus === 'denied'
-                    }" :title="notifyStatus === 'granted' ? 'Notifications Enabled' : 'Click to Enable Notifications'">
+                        'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 animate-pulse': notifyStatus === 'default',
+                        'text-indigo-500 dark:text-indigo-400 bg-indigo-500/10': notifyStatus === 'granted',
+                        'text-gray-500 dark:text-gray-700 bg-black/5 dark:bg-white/5': notifyStatus === 'denied'
+                    }">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path
                             d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                     </svg>
                 </button>
-                
+
                 <button @click="openCreateModal()"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-white/10 dark:hover:bg-white/20 dark:border border-white/10 dark:text-white/90 px-4 py-2 rounded-full text-xs font-medium transition-all shadow-md dark:shadow-none">+
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-600 dark:hover:bg-indigo-500 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-md">+
                     New</button>
             </div>
         </div>
@@ -154,19 +153,15 @@
     <main class="max-w-3xl mx-auto px-4 py-6 pb-32 min-h-screen">
         <div class="space-y-4">
             <template x-for="(sw, index) in switches" :key="sw.id">
-                <div 
-                    draggable="true"
-                    @dragstart="dragStart($event, index)"
-                    @dragover.prevent
-                    @drop="drop($event, index)"
-                    @dragend="dragEnd()"
-                    class="glass border border-gray-200 dark:border-white/5 rounded-2xl p-5 shadow-sm dark:shadow-2xl relative overflow-hidden group transition-all duration-300 cursor-grab active:cursor-grabbing"
+                <div draggable="true" @dragstart="dragStart($event, index)" @dragover.prevent
+                    @drop="drop($event, index)" @dragend="dragEnd()"
+                    class="glass border border-gray-200 dark:border-white/10 rounded-2xl p-5 shadow-sm dark:shadow-2xl relative overflow-hidden group transition-all duration-300 cursor-grab active:cursor-grabbing"
                     :class="[
                         sw.status === 'disabled' ? 'disabled-card-container' : '',
-                        draggingIndex === index ? 'opacity-20 scale-95 border-dashed border-indigo-400 dark:border-indigo-500' : ''
+                        draggingIndex === index ? 'opacity-20 scale-95 border-dashed border-indigo-500' : ''
                     ]">
 
-                    <div :class="sw.status === 'disabled' ? '' : (sw.status === 'triggered' || sw.status === 'failed' ? 'bg-red-500/10' : (isPending(sw) ? 'bg-amber-500/20 animate-pulse' : (isExpiringSoon(sw.triggerAt) ? 'bg-orange-500/20 animate-pulse' : 'bg-emerald-500/5')))"
+                    <div :class="sw.status === 'disabled' ? '' : (sw.status === 'triggered' || sw.status === 'failed' ? 'bg-red-500/5' : (isPending(sw) ? 'bg-amber-500/10 animate-pulse' : (isExpiringSoon(sw.triggerAt) ? 'bg-orange-500/10 animate-pulse' : 'bg-emerald-500/5')))"
                         class="absolute inset-0 pointer-events-none transition-colors duration-1000"></div>
 
                     <div class="relative z-10">
@@ -174,14 +169,13 @@
                             <div class="flex items-center gap-2">
                                 <span
                                     :class="sw.status === 'disabled' ? 'text-gray-500 bg-gray-500/10 border-gray-500/20' : 
-                                    (sw.status === 'triggered' || sw.status === 'failed' ? 'text-red-500 dark:text-red-400 bg-red-500/10 dark:bg-red-400/10 border-red-500/20 dark:border-red-400/20' : 
-                                    (isPending(sw) ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-400/10 border-amber-500/20 dark:border-amber-400/20' : 
-                                    (isExpiringSoon(sw.triggerAt) ? 'text-orange-600 dark:text-orange-400 bg-orange-500/10 dark:bg-orange-400/10 border-orange-500/20 dark:border-orange-400/20' : 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-400/10 border-emerald-500/20 dark:border-emerald-400/20')))"
+                                    (sw.status === 'triggered' || sw.status === 'failed' ? 'text-red-500 bg-red-500/10 border-red-500/20' : 
+                                    (isPending(sw) ? 'text-amber-500 bg-amber-500/10 border-amber-500/20' : 
+                                    (isExpiringSoon(sw.triggerAt) ? 'text-orange-500 bg-orange-500/10 border-orange-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20')))"
                                     class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border"
-                                    :class="sw.status === 'failed' ? 'animate-pulse ring-1 ring-red-500/50' : ''"
-                                    x-text="sw.status === 'disabled' ? 'Paused' : (sw.status === 'triggered' ? 'Triggered' : (sw.status === 'failed' ? 'Failed' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.triggerAt) ? 'Soon' : 'Active'))))">
+                                    x-text="sw.status === 'disabled' ? 'Disabled' : (sw.status === 'triggered' ? 'Triggered' : (sw.status === 'failed' ? 'Failed' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.triggerAt) ? 'Soon' : 'Active'))))">
                                 </span>
-                                
+
                                 <template x-if="isReminderEnabled(sw)">
                                     <div class="flex items-center justify-center text-indigo-500 dark:text-indigo-400 animate-pulse"
                                         title="Push Notifications Enabled">
@@ -194,51 +188,57 @@
                             </div>
                             <div class="flex gap-2">
                                 <button x-show="sw.status !== 'disabled'" @click="disableSw(sw.id)"
-                                    class="p-2 text-gray-400 hover:text-amber-500 dark:hover:text-amber-400 transition-colors"
-                                    title="Pause Switch">
+                                    class="p-2 text-gray-500 hover:text-amber-500 transition-colors">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 </button>
                                 <button x-show="!sw.encrypted" @click="openEditModal(sw)"
-                                    class="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"><svg
-                                        class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    class="p-2 text-gray-500 hover:text-indigo-400 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path
                                             d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
                                             stroke-width="2" stroke-linecap="round"></path>
-                                    </svg></button>
+                                    </svg>
+                                </button>
                                 <button @click="deleteSw(sw.id)"
-                                    class="p-2 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><svg class="w-5 h-5"
-                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    class="p-2 text-gray-500 hover:text-red-500 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path
                                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                                             stroke-width="2" stroke-linecap="round"></path>
-                                    </svg></button>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
 
-                        <div :class="sw.status === 'disabled' ? 'opacity-40 grayscale' : ''">
+                        <div :class="sw.status === 'disabled' ? 'opacity-30 grayscale' : ''">
                             <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-1 truncate"
                                 x-text="sw.encrypted ? '••••••••' : sw.message"></h2>
 
                             <div class="flex flex-wrap gap-1.5 mb-4">
                                 <template x-for="uri in (sw.notifiers || [])" :key="uri">
                                     <span
-                                        class="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded text-[9px] font-bold uppercase tracking-wider"
+                                        class="px-2 py-0.5 bg-indigo-500/10 border border-indigo-500/10 text-indigo-400 rounded text-[9px] font-bold uppercase tracking-wider"
                                         x-text="uri.includes('://') ? uri.split('://')[0] : 'Secret'">
                                     </span>
                                 </template>
                             </div>
 
-                            <div class="flex justify-between items-end">
-                                <div><span
-                                        class="text-[10px] text-gray-500 uppercase font-bold block">Interval</span><span
-                                        class="text-sm font-medium text-gray-600 dark:text-gray-300" x-text="sw.checkInInterval"></span>
+                            <div
+                                class="flex justify-between items-center bg-black/10 dark:bg-black/40 rounded-xl p-3 border border-black/5 dark:border-white/5">
+                                <div>
+                                    <span
+                                        class="text-[9px] text-gray-500 uppercase font-bold block mb-0.5">Interval</span>
+                                    <span class="text-sm font-medium text-gray-600 dark:text-gray-400"
+                                        x-text="sw.checkInInterval"></span>
                                 </div>
-                                <div class="text-right"><span
-                                        class="text-[10px] text-gray-500 uppercase font-bold">Remaining</span><span
-                                        :class="sw.status === 'disabled' ? 'text-gray-500' : (sw.status === 'triggered' || sw.status === 'failed' ? 'text-red-500' : (isPending(sw) ? 'text-amber-500 dark:text-amber-400' : (isExpiringSoon(sw.triggerAt) ? 'text-orange-500 dark:text-orange-400' : 'text-indigo-600 dark:text-indigo-400')))"
+                                <div class="text-right">
+                                    <span
+                                        class="text-[9px] text-gray-500 uppercase font-bold block mb-0.5">Remaining</span>
+                                    <span
+                                        :class="sw.status === 'disabled' ? 'text-gray-600' : (sw.status === 'triggered' || sw.status === 'failed' ? 'text-red-500' : (isPending(sw) ? 'text-amber-500' : (isExpiringSoon(sw.triggerAt) ? 'text-orange-500' : 'text-emerald-400')))"
                                         class="text-sm font-mono font-bold block"
                                         x-text="sw.status === 'disabled' ? 'PAUSED' : (sw.status === 'triggered' ? 'TRIGGERED' : (sw.status === 'failed' ? 'FAILED' : getCountdown(sw.triggerAt)))"></span>
                                 </div>
@@ -247,15 +247,17 @@
 
                         <div class="pt-4 border-t border-gray-200 dark:border-white/5 mt-4">
                             <button @click="resetSw(sw.id)" :disabled="resettingId === sw.id"
-                                :class="resettingId === sw.id ? 'bg-emerald-500 text-black border-emerald-500 scale-[0.97]' : (sw.status === 'disabled' ? 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-white border-gray-200 dark:border-white/10 hover:bg-gray-200 dark:hover:bg-white/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-100 dark:hover:bg-emerald-500/20')"
-                                class="w-full py-4 border text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden relative active:scale-95">
+                                :class="resettingId === sw.id ? 'bg-emerald-600 text-white scale-[0.97]' : (sw.status === 'disabled' ? 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-white/10' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20')"
+                                class="w-full py-4 border border-transparent text-[11px] font-black uppercase tracking-[0.2em] rounded-xl transition-all duration-300 flex items-center justify-center gap-2 relative active:scale-95">
                                 <span x-show="resettingId !== sw.id"
                                     x-text="(sw.status === 'disabled' || sw.status === 'triggered' ) ? 'Enable' : 'Check In'"></span>
-                                <span x-show="resettingId === sw.id" class="flex items-center gap-2"><svg
-                                        class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor"
+                                <span x-show="resettingId === sw.id" class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor"
                                         viewBox="0 0 24 24">
                                         <path d="M5 13l4 4L19 7" stroke-width="3" stroke-linecap="round"></path>
-                                    </svg> <span x-text="sw.status === 'disabled' ? 'Enabled' : 'Checked In'"></span></span>
+                                    </svg>
+                                    <span x-text="sw.status === 'disabled' ? 'Enabled' : 'Checked In'"></span>
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -272,7 +274,8 @@
             class="relative w-full max-w-lg bg-white dark:bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-gray-200 dark:border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <form @submit.prevent="saveSw">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-black text-gray-900 dark:text-white" x-text="editingId ? 'Edit Switch' : 'New Switch'"></h3>
+                    <h3 class="text-xl font-black text-gray-900 dark:text-white"
+                        x-text="editingId ? 'Edit Switch' : 'New Switch'"></h3>
                     <button type="button" @click="openModal = false"
                         class="text-gray-500 text-xs font-bold uppercase">Close</button>
                 </div>
@@ -285,9 +288,13 @@
                                 class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]">
                             </div>
                             <div>
-                                <p class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Push
+                                <p
+                                    class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                                    Push
                                     Notifications On</p>
-                                <p class="text-[9px] text-emerald-600/60 dark:text-emerald-400/60 uppercase font-medium">Ready for reminders</p>
+                                <p
+                                    class="text-[9px] text-emerald-600/60 dark:text-emerald-400/60 uppercase font-medium">
+                                    Ready for reminders</p>
                             </div>
                         </div>
                     </div>
@@ -343,10 +350,12 @@
 
                     <div class="flex gap-4">
                         <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.deleteAfterTriggered"
-                                type="checkbox" class="rounded bg-gray-200 dark:bg-white/5 text-indigo-500 border-gray-300 dark:border-transparent"><span
+                                type="checkbox"
+                                class="rounded bg-gray-200 dark:bg-white/5 text-indigo-500 border-gray-300 dark:border-transparent"><span
                                 class="text-[10px] text-gray-500 dark:text-gray-400">Auto-Delete</span></label>
                         <label class="flex items-center gap-2 cursor-pointer"><input x-model="form.encrypted"
-                                type="checkbox" class="rounded bg-gray-200 dark:bg-white/5 text-indigo-500 border-gray-300 dark:border-transparent"><span
+                                type="checkbox"
+                                class="rounded bg-gray-200 dark:bg-white/5 text-indigo-500 border-gray-300 dark:border-transparent"><span
                                 class="text-[10px] text-gray-500 dark:text-gray-400">Encrypted</span></label>
                     </div>
                 </div>
@@ -366,7 +375,7 @@
                 notifyStatus: ('Notification' in window) ? Notification.permission : 'unsupported',
                 vapidPublicKey: '',
                 darkMode: document.documentElement.classList.contains('dark'),
-                
+
                 // Drag and Drop state
                 draggingIndex: null,
 
@@ -387,7 +396,7 @@
                     notifiersStr: '',
                     deleteAfterTriggered: false,
                     encrypted: false,
-                    reminderEnabled: false, 
+                    reminderEnabled: false,
                     reminderThreshold: '',
                     reminderIndex: 0,
                     pushSubscription: null
@@ -468,12 +477,12 @@
                     return sw.reminderEnabled && sw.status !== 'disabled';
                 },
 
-               isExpiringSoon(deadline) {
+                isExpiringSoon(deadline) {
                     const diff = ((deadline * 1000) - this.now) / 60000;
                     return diff > 0 && diff <= 30;
                 },
 
-               isPending(sw) {
+                isPending(sw) {
                     return sw.status === 'active' && (sw.triggerAt * 1000 - this.now) <= 0;
                 },
 
@@ -481,12 +490,12 @@
                     const total = (deadline * 1000) - this.now;
                     if (isNaN(total) || total <= 0) return "00:00:00";
 
-                    const s = Math.floor((total / 1000) % 60), 
-                        m = Math.floor((total / 60000) % 60), 
-                        h = Math.floor((total / 3600000) % 24), 
+                    const s = Math.floor((total / 1000) % 60),
+                        m = Math.floor((total / 60000) % 60),
+                        h = Math.floor((total / 3600000) % 24),
                         d = Math.floor(total / 86400000);
 
-                    return (d > 0 ? d + 'd ' : '') + 
+                    return (d > 0 ? d + 'd ' : '') +
                         [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
                 },
 
@@ -559,10 +568,10 @@
                         const r = await fetch(`${this.baseUrl}/switch`);
                         if (!r.ok) throw new Error("Server error");
                         const data = await r.json();
-                        
+
                         // Apply custom sort order
                         this.switches = this.sortSwitches(data);
-                        
+
                         this.isOnline = true;
                     } catch (e) {
                         this.isOnline = false;
@@ -574,38 +583,38 @@
                 sortSwitches(data) {
                     const savedOrder = localStorage.getItem('switchOrder');
                     if (!savedOrder) return data;
-                    
+
                     try {
                         const orderIds = JSON.parse(savedOrder);
                         const orderMap = new Map(orderIds.map((id, index) => [id, index]));
-                        
+
                         return data.sort((a, b) => {
                             const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
                             const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
                             return indexA - indexB;
                         });
-                    } catch(e) { return data; }
+                    } catch (e) { return data; }
                 },
 
                 dragStart(e, index) {
                     this.draggingIndex = index;
                     e.dataTransfer.effectAllowed = 'move';
                     // Firefox requires data to be set for drag to work
-                    e.dataTransfer.setData('text/plain', index); 
+                    e.dataTransfer.setData('text/plain', index);
                 },
 
                 drop(e, targetIndex) {
                     if (this.draggingIndex === null) return;
-                    
+
                     const item = this.switches[this.draggingIndex];
-                    
+
                     // Remove from old position
                     this.switches.splice(this.draggingIndex, 1);
                     // Insert at new position
                     this.switches.splice(targetIndex, 0, item);
-                    
+
                     this.draggingIndex = null;
-                    
+
                     // Save new order to localStorage
                     const newOrder = this.switches.map(s => s.id);
                     localStorage.setItem('switchOrder', JSON.stringify(newOrder));
@@ -713,4 +722,5 @@
         </div>
     </div>
 </body>
+
 </html>

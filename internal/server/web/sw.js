@@ -45,13 +45,13 @@ self.addEventListener('notificationclick', (event) => {
 
     if (event.action === 'checkin' && switchId) {
         event.waitUntil(
-            // The API change doesn't break this endpoint, 
+            // The API change doesn't break this endpoint,
             // but we call it to move status from 'active' back to a full timer
             fetch(`/api/v1/switch/${switchId}/reset`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
-                // Note: We don't send the pushSubscription here because 
-                // the SW doesn't have easy access to it, and the server 
+                // Note: We don't send the pushSubscription here because
+                // the SW doesn't have easy access to it, and the server
                 // should retain the existing one if not provided.
             }).then(response => {
                 if (response.ok) {
@@ -63,8 +63,7 @@ self.addEventListener('notificationclick', (event) => {
                 }
             }).catch(err => console.error("Check-in fetch failed:", err))
         );
-    } 
-    else {
+    } else {
         event.waitUntil(
             clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
                 for (const client of clientList) {
