@@ -1,3 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #6366f1; /* You can define theme variables here now */
+};
+
+@source "."; 
+
+@variant dark (&:where(.dark, .dark *));

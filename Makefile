@@ -1,4 +1,3 @@
-# --- 1. METADATA & VERSIONING ---
 PROJECT   := $(shell grep module go.mod | rev | cut -d'/' -f1-2 | rev)
 NAMESPACE := $(shell echo $(PROJECT) | cut -d'/' -f1)
 REPO      := $(shell echo $(PROJECT) | cut -d'/' -f2)
@@ -14,7 +13,6 @@ endif
 
 GO_BUILD_FLAGS := -ldflags="-s -w -X '$(MODULE)/cmd.version=$(VERSION)' -X '$(MODULE)/cmd.commit=$(COMMIT)' -X '$(MODULE)/cmd.date=$(DATE)'"
 
-# --- 2. PATHS & FILES ---
 OPENAPI_SPEC  := api/openapi.yaml
 GEN_GO_FILE   := api/gen.go
 INTERNAL_YAML := api/openapi.internal.gen.yaml
@@ -54,10 +52,14 @@ $(GEN_GO_FILE) $(INTERNAL_YAML) $(EXTERNAL_YAML): $(OPENAPI_SPEC)
 
 # Tailwind Compilation
 $(CSS_OUT): $(INPUT_CSS) $(HTML_FILES)
-	@echo "==> Building & Compressing Tailwind CSS..."
+	@echo "==> Building & Compressing Tailwind CSS (v4)..."
 	@mkdir -p $(STATIC_DIR)/css
 	@docker run --rm -v $$PWD:/src -w /src node:slim \
-		sh -c "npx --yes tailwindcss@3 -i $(INPUT_CSS) -o $(CSS_OUT) --config $(WEB_DIR)/tailwind.config.js --minify"
+		sh -c "npm init -y > /dev/null && \
+		npm install --no-save tailwindcss@4 @tailwindcss/cli@4 && \
+		npx tailwindcss -i $(INPUT_CSS) -o $(CSS_OUT) --minify"
+	@rm package.json
+	@rm -rf node_modules
 
 # AlpineJS Bundle
 $(JS_OUT):
