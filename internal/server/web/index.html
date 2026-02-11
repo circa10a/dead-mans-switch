@@ -5,20 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="manifest" href="/manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Dead Man">
     <link rel="apple-touch-icon" href="/images/purple-skull-512-maskable-square.png">
     <link rel="icon" type="image/png" href="/images/favicon.ico">
+    <link href="/static/css/tailwind.css" rel="stylesheet">
 
     <title>Dead Man's Switch</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
-    </script>
+    <script defer src="/static/js/alpine.min.js"></script>
     <style>
         [x-cloak] {
             display: none !important;
@@ -368,6 +363,8 @@
     <script>
         function app() {
             return {
+                sw: null,
+                switches: [],
                 baseUrl: '/api/v1', switches: [], openModal: false, editingId: null, now: Date.now(), resettingId: null,
                 isOnline: navigator.onLine,
                 isSecure: window.isSecureContext || window.location.protocol === 'https:',
@@ -474,6 +471,7 @@
                 },
 
                 isReminderEnabled(sw) {
+                    if (!sw) return false; // Simple safety check for modal scope
                     return sw.reminderEnabled && sw.status !== 'disabled';
                 },
 
@@ -545,7 +543,6 @@
                     this.openModal = true;
                 },
 
-
                 async deleteSw(id) {
                     if (confirm('Delete?')) {
                         await fetch(`${this.baseUrl}/switch/${id}`, { method: 'DELETE' });
@@ -577,51 +574,6 @@
                         this.isOnline = false;
                         console.error("Fetch failed:", e);
                     }
-                },
-
-                // Drag and Drop
-                sortSwitches(data) {
-                    const savedOrder = localStorage.getItem('switchOrder');
-                    if (!savedOrder) return data;
-
-                    try {
-                        const orderIds = JSON.parse(savedOrder);
-                        const orderMap = new Map(orderIds.map((id, index) => [id, index]));
-
-                        return data.sort((a, b) => {
-                            const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
-                            const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
-                            return indexA - indexB;
-                        });
-                    } catch (e) { return data; }
-                },
-
-                dragStart(e, index) {
-                    this.draggingIndex = index;
-                    e.dataTransfer.effectAllowed = 'move';
-                    // Firefox requires data to be set for drag to work
-                    e.dataTransfer.setData('text/plain', index);
-                },
-
-                drop(e, targetIndex) {
-                    if (this.draggingIndex === null) return;
-
-                    const item = this.switches[this.draggingIndex];
-
-                    // Remove from old position
-                    this.switches.splice(this.draggingIndex, 1);
-                    // Insert at new position
-                    this.switches.splice(targetIndex, 0, item);
-
-                    this.draggingIndex = null;
-
-                    // Save new order to localStorage
-                    const newOrder = this.switches.map(s => s.id);
-                    localStorage.setItem('switchOrder', JSON.stringify(newOrder));
-                },
-
-                dragEnd() {
-                    this.draggingIndex = null;
                 },
 
                 async resetSw(id) {
@@ -674,6 +626,51 @@
                     } catch (e) {
                         console.error("Save failed", e);
                     }
+                },
+
+                // Drag and Drop
+                sortSwitches(data) {
+                    const savedOrder = localStorage.getItem('switchOrder');
+                    if (!savedOrder) return data;
+
+                    try {
+                        const orderIds = JSON.parse(savedOrder);
+                        const orderMap = new Map(orderIds.map((id, index) => [id, index]));
+
+                        return data.sort((a, b) => {
+                            const indexA = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+                            const indexB = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+                            return indexA - indexB;
+                        });
+                    } catch (e) { return data; }
+                },
+
+                dragStart(e, index) {
+                    this.draggingIndex = index;
+                    e.dataTransfer.effectAllowed = 'move';
+                    // Firefox requires data to be set for drag to work
+                    e.dataTransfer.setData('text/plain', index);
+                },
+
+                drop(e, targetIndex) {
+                    if (this.draggingIndex === null) return;
+
+                    const item = this.switches[this.draggingIndex];
+
+                    // Remove from old position
+                    this.switches.splice(this.draggingIndex, 1);
+                    // Insert at new position
+                    this.switches.splice(targetIndex, 0, item);
+
+                    this.draggingIndex = null;
+
+                    // Save new order to localStorage
+                    const newOrder = this.switches.map(s => s.id);
+                    localStorage.setItem('switchOrder', JSON.stringify(newOrder));
+                },
+
+                dragEnd() {
+                    this.draggingIndex = null;
                 },
 
                 async getSubscription() {
