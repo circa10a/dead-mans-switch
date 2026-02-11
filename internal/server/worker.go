@@ -86,16 +86,32 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 	w.Logger.Info("Switch expired, sending final notifications", "id", *sw.Id)
 
 	// Send External Notifiers (Shoutrrr)
-	err := w.sendNotifiers(sw)
-	if err != nil {
-		w.Logger.Error("Failed to send notifications", "id", *sw.Id, "error", err)
-		return err
+	sendErr := w.sendNotifiers(sw)
+	if sendErr != nil {
+		w.Logger.Error("Failed to send notifications", "id", *sw.Id, "error", sendErr)
+
+		// Set as failed if not already
+		if sw.Status == nil || *sw.Status != api.SwitchStatusFailed {
+			statusFailed := api.SwitchStatusFailed
+			sw.Status = &statusFailed
+
+			_, err := w.Store.Update(*sw.Id, sw)
+			if err != nil {
+				return err
+			}
+
+			err = w.sendWebPush(sw, "Failed to trigger switch", sendErr.Error())
+			if err != nil {
+				return err
+			}
+		}
+		return sendErr
 	}
 
 	// Send Web Push to the Owner (if subscribed)
 	if sw.PushSubscription != nil {
 		w.Logger.Debug("Switch expired, sending web push alert", "id", *sw.Id)
-		err = w.sendWebPush(sw, "Switch Activated", "Your switch has triggered and notifications have been sent.")
+		err := w.sendWebPush(sw, "Switch Activated", "Your switch has triggered and notifications have been sent.")
 		if err != nil {
 			w.Logger.Error("Failed to send expiration web push", "id", *sw.Id, "error", err)
 		}
@@ -103,7 +119,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 
 	if *sw.DeleteAfterTriggered {
 		w.Logger.Debug("Auto-deleting switch after triggering", "id", *sw.Id)
-		err = w.Store.Delete(*sw.Id)
+		err := w.Store.Delete(*sw.Id)
 		if err != nil {
 			return err
 		}
@@ -113,7 +129,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 	w.Logger.Debug("Marking switch as triggered", "id", *sw.Id)
 	statusTriggered := api.SwitchStatusTriggered
 	sw.Status = &statusTriggered
-	_, err = w.Store.Update(*sw.Id, sw)
+	_, err := w.Store.Update(*sw.Id, sw)
 	if err != nil {
 		return err
 	}

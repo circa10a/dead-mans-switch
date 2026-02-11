@@ -18,8 +18,9 @@ type MockStore struct {
 	SentFunc                 func(id int) error
 
 	DeletedCalled          bool
-	SentCalled             bool
+	FailedCalled           bool
 	MarkReminderSentCalled bool
+	SentCalled             bool
 }
 
 // Interface methods
@@ -57,6 +58,10 @@ func (m *MockStore) Update(id int, sw api.Switch) (api.Switch, error) {
 
 	if sw.ReminderSent != nil && *sw.ReminderSent {
 		m.MarkReminderSentCalled = true
+	}
+
+	if *sw.Status == api.SwitchStatusFailed {
+		m.FailedCalled = true
 	}
 
 	return sw, nil
@@ -175,12 +180,14 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 	t.Run("should attempt all notifiers even if one fails", func(t *testing.T) {
 		mock := &MockStore{
 			GetExpiredFunc: func(limit int) ([]api.Switch, error) {
-				return []api.Switch{{
-					Id:                   &testID,
-					Message:              "fault tolerance test",
-					Notifiers:            []string{"invalid://scheme", "logger://"},
-					DeleteAfterTriggered: ptr(false),
-				}}, nil
+				return []api.Switch{
+					{
+						Id:                   &testID,
+						Message:              "fault tolerance test",
+						Notifiers:            []string{"invalid://scheme", "logger://"},
+						DeleteAfterTriggered: ptr(false),
+					},
+				}, nil
 			},
 			SentFunc: func(id int) error { return nil },
 		}
@@ -191,6 +198,34 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 		// Because one notifier failed, the aggregate error should have prevented
 		// the database from being updated to "Sent".
 		assert.False(t, mock.SentCalled, "Should not mark as triggered if any notifier in the list fails")
+	})
+
+	t.Run("should mark as failed if sending fails", func(t *testing.T) {
+		testID := 999
+		// Use an invalid notifier URL to force a failure
+		invalidNotifier := "invalid://scheme"
+
+		mock := &MockStore{
+			GetExpiredFunc: func(limit int) ([]api.Switch, error) {
+				return []api.Switch{{
+					Id:                   &testID,
+					Message:              "failure test",
+					Notifiers:            []string{invalidNotifier},
+					DeleteAfterTriggered: ptr(false),
+				}}, nil
+			},
+		}
+
+		w := &Worker{
+			Store:     mock,
+			BatchSize: 10,
+			Logger:    logger,
+		}
+
+		w.sweep()
+
+		assert.True(t, mock.FailedCalled, "Expected switch to be marked as failed in DB")
+		assert.False(t, mock.SentCalled, "Switch should not be marked as triggered on failure")
 	})
 }
 
