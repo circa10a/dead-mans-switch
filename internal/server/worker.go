@@ -13,6 +13,8 @@ import (
 	"github.com/circa10a/dead-mans-switch/api"
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
 	"github.com/nicholas-fedor/shoutrrr"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Worker periodically processes expired switches and sends notifications.
@@ -94,7 +96,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 		if sw.Status == nil || *sw.Status != api.SwitchStatusFailed {
 			statusFailed := api.SwitchStatusFailed
 			sw.Status = &statusFailed
-			failureMsg := sendErr.Error()
+			failureMsg := cases.Title(language.English).String(sendErr.Error())
 			sw.FailureReason = &failureMsg
 
 			_, err := w.Store.Update(*sw.Id, sw)
@@ -102,7 +104,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 				return err
 			}
 
-			err = w.sendWebPush(sw, "Failed to trigger switch", sendErr.Error())
+			err = w.sendWebPush(sw, "Failed to trigger switch", failureMsg)
 			if err != nil {
 				return err
 			}

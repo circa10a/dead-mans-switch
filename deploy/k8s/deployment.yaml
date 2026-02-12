@@ -7,7 +7,7 @@ spec:
   selector:
     matchLabels:
       app: dead-mans-switch
-  replicas: 2
+  replicas: 1
   template:
     metadata:
       labels:
@@ -16,5 +16,14 @@ spec:
       containers:
       - name: dead-mans-switch
         image: circa10a/dead-mans-switch
+        command: ["dead-mans-switch"]
+        args: ["server", "--storage-dir", "/data"]
         ports:
         - containerPort: 8080
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: dead-mans-switch-pvc

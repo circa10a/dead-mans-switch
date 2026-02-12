@@ -1,177 +1,190 @@
-# 💤 dead-man-switch-api
+# dead-mans-switch
 
-A project template for Go REST API's.
+![Build Status](https://github.com/circa10a/dead-mans-switch/workflows/deploy/badge.svg)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/circa10a/dead-mans-switch)
 
-![Build Status](https://github.com/circa10a/dead-man-switch-api/workflows/deploy/badge.svg)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/circa10a/dead-man-switch-api)
+<img width="45%" src="" align="right" style="margin-left: 20px"/>
 
-<img width="40%" src="https://raw.githubusercontent.com/ashleymcnamara/gophers/refs/heads/master/CouchPotatoGopher.png" align="right"/>
+**Dead Man's Switch** is an all one self-hosted app for creating a "Dead Man's Switch". Create switch
+via the UI, API, or CLI that sends a message via many providers if you don't "check-in" by resetting your timer.
 
-- [dead-man-switch-api](#dead-man-switch-api)
-  - [Features](#features)
-  - [Usage](#usage)
-    - [Repository setup](#repository-setup)
-    - [Initialize a new project](#initialize-a-new-project)
-    - [Server](#server)
-  - [Development](#development)
-    - [Start the server](#start-the-server)
-    - [Default Routes](#default-routes)
-    - [Adding routes](#adding-routes)
-    - [Generate OpenAPI docs](#generate-openapi-documentation)
-    - [Generate Client SDK](#generate-client-sdk)
-- [Docker compose](#docker-compose)
-- [Kubernetes](#kubernetes)
+## Quick Start
 
-## Features
+### Demo
 
-- :lock: Secure by default with automatic TLS powered by [CertMagic](https://github.com/caddyserver/certmagic)
-- :chart_with_upwards_trend: Prometheus metrics
-- :scroll: Beautiful logging via [charmbracelet](https://github.com/charmbracelet/log)
-- :book: OpenAPI documentation built in with SDK generation
-- Easy kubernetes development via [Tilt](https://github.com/tilt-dev/tilt)
-- A full local monitoring stack using [Grafana](https://grafana.com/), [Prometheus](https://prometheus.io/), and [Loki](https://grafana.com/oss/loki/) via Docker compose.
-- :construction_worker: CI pipelines via GitHub actions
-  - Tests
-  - Linting via [golangci-lint](https://github.com/golangci/golangci-lint)
-  - Security scanning via [gosec](https://github.com/securego/gosec)
-  - Secret scanning via [gitleaks](https://github.com/gitleaks/gitleaks)
-  - Automatic semantic version tagging
-  - [GoReleaser](https://github.com/goreleaser/goreleaser)
-  - Docker build and pushes for latest and tagged versions
+Try the live demo at [insert demo URL here]
 
-## Usage
+### Deploy
 
-### Repository setup
+```bash
+# Start the server with default settings (HTTP)
+# http://localhost:8080
+docker run -v -p 8080:8080 $PWD/dead-mans-switch-data:/data circa10a/dead-mans-switch
 
-The default GitHub actions that come with this project has 1 setup requirement.
+# Start with HTTPS (Let's Encrypt for automatic TLS)
+# Requires domain pointing to host address
+# http://myexamplesite.com
+docker run -v -p 443:443 80:80 $PWD/dead-mans-switch-data:/data circa10a/dead-mans-switch \
+  --auto-tls \
+  --domains myexamplesite.com \
+  --storage-dir /data
 
-1. `DOCKERHUB_TOKEN` - Login to [Docker Hub](https://hub.docker.com/) and [create a personal access token](https://docs.docker.com/security/for-developers/access-tokens/) with `Read, Write` scope to push docker images under your account.
-
-> [!WARNING]
-> This assumes your Docker Hub namespace matches your git repository namespace.
-> Example: github.com/mynamespace/myrepo will push to mynamespace/myrepo on Docker Hub
-
-1. Enable dependabot updates - Navigate to repository > Security > Code security > Grouped security updates > Enabled
-
-### Initialize a new project
-
-Use [gonew](https://pkg.go.dev/golang.org/x/tools/cmd/gonew) to initialize a new project from this template:
-
-```console
-# Install gonew (if needed)
-$ go install golang.org/x/tools/cmd/gonew@latest
-
-# Init project
-$ gonew github.com/circa10a/dead-man-switch-api github.com/namespace/project
+# Start with HTTPS (Custom Certs)
+docker run -v -p 8443:8443 $PWD/certs:/certs $PWD/dead-mans-switch-data:/data circa10a/dead-mans-switch server \
+  --auto-tls \
+  --domains myexamplesite.com \
+  --storage-dir /data \
+  --tls-certificate /certs/cert.pem \
+  --tls-key /certs/key.pem
 ```
 
-Finally, replace all of the existing references of the template repository with your newly created one by running:
+> [!NOTE]
+> HTTPS is required for push notifications.
+
+### API Documentation
+
+Visit the interactive API documentation:
+
+- **API Docs**: http://localhost:8080/v1/docs
+
+## CLI Reference
+
+### Install
 
 ```console
-$ make template
+# curl
+# TODO
+
+# Go
+go install github.com/circa10a/dead-mans-switch
 ```
 
-### Overview
+### Usage
 
 ```console
-$ go run .
-A template project for Go REST API's
+$ dead-mans-switch
+A REST API for managing Dead Man's switches
 
 Usage:
-  dead-man-switch-api [command]
+  dead-mans-switch [command]
 
 Available Commands:
   completion  Generate the autocompletion script for the specified shell
   help        Help about any command
-  server      Start the dead-man-switch-api server
+  server      Start the dead-mans-switch server
+  switch      Manage dead man switches
+  version     Print the version information
 
 Flags:
-  -h, --help   help for dead-man-switch-api
+  -h, --help      help for dead-mans-switch
+  -v, --version   version for dead-mans-switch
 
-Use "dead-man-switch-api [command] --help" for more information about a command.
+Use "dead-mans-switch [command] --help" for more information about a command.
 ```
 
-## Server
+### Server Command
 
-```console
-$ go run . server --help
-
-Start the dead-man-switch-api server
+```
+$ dead-mans-switch server -h
+Start the dead-mans-switch server
 
 Usage:
-  dead-man-switch-api server [flags]
+  dead-mans-switch server [flags]
 
 Flags:
-  -a, --auto-tls                 Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation. (env: APP_AUTO_TLS)
-  -d, --domains stringArray      Domains to issue certificate for. Must be used with --auto-tls. (env: APP_DOMAINS)
-  -h, --help                     help for server
-  -f, --log-format string        Server logging format. Supported values are 'text' and 'json'. (env: APP_LOG_FORMAT) (default "text")
-  -l, --log-level string         Server logging level. (env: APP_LOG_LEVEL) (default "info")
-  -m, --metrics                  Enable Prometheus metrics intrumentation. (env: APP_METRICS)
-  -p, --port int                 Port to listen on. Cannot be used in conjunction with --auto-tls since that will require listening on 80 and 443. (env: APP_PORT) (default 8080)
-      --tls-certificate string   Path to custom TLS certificate. Cannot be used with --auto-tls. (env: APP_TLS_CERTIFICATE)
-      --tls-key string           Path to custom TLS key. Cannot be used with --auto-tls. (env: APP_TLS_KEY)
+  -a, --auto-tls                   Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation. (env: DEAD_MANS_SWITCH_AUTO_TLS)
+      --contact-email string       Email used for TLS cert registration + push notification point of contact (not required). (env: DEAD_MANS_SWITCH_CONTACT_EMAIL) (default "user@dead-mans-switch.com")
+  -d, --domains stringArray        Domains to issue certificate for. Must be used with --auto-tls. (env: DEAD_MANS_SWITCH_DOMAINS)
+  -h, --help                       help for server
+  -f, --log-format string          Server logging format. Supported values are 'text' and 'json'. (env: DEAD_MANS_SWITCH_LOG_FORMAT) (default "text")
+  -l, --log-level string           Server logging level. (env: DEAD_MANS_SWITCH_LOG_LEVEL) (default "info")
+  -m, --metrics                    Enable Prometheus metrics instrumentation. (env: DEAD_MANS_SWITCH_METRICS)
+  -p, --port int                   Port to listen on. Cannot be used in conjunction with --auto-tls since that will require listening on 80 and 443. (env: DEAD_MANS_SWITCH_PORT) (default 8080)
+  -s, --storage-dir string         Storage directory for database (env: DEAD_MANS_SWITCH_STORAGE_DIR) (default "./data")
+      --tls-certificate string     Path to custom TLS certificate. Cannot be used with --auto-tls. (env: DEAD_MANS_SWITCH_TLS_CERTIFICATE)
+      --tls-key string             Path to custom TLS key. Cannot be used with --auto-tls. (env: DEAD_MANS_SWITCH_TLS_KEY)
+      --worker-batch-size int      How many notification records to process at a time. (env: DEAD_MANS_SWITCH_WORKER_BATCH_SIZE) (default 1000)
+      --worker-interval duration   How often to check for expired switches. (env: DEAD_MANS_SWITCH_WORKER_INTERVAL) (default 5m0s)
 ```
+
+## Deployment
+
+### Docker Compose
+
+Run the service with integrated monitoring and observability stack:
+
+```bash
+make docker-compose
+```
+
+This starts:
+- **API Server**: http://localhost:8080
+- **Grafana** (dashboards): http://localhost:3000
+- **Prometheus** (metrics): http://localhost:9090
+- **Loki** (logs)
+- **Promtail** (log shipper)
+
+
+### Kubernetes
+
+Deploy to Kubernetes using the provided manifests:
+
+```bash
+# Apply the manifests from the repository
+kubectl apply -f https://raw.githubusercontent.com/circa10a/dead-mans-switch/main/deploy/k8s/
+
+# Verify deployment
+kubectl get pods -l app=dead-mans-switch
+```
+
+The service will be available based on your Kubernetes configuration.
+
+For local development with [Tilt](https://tilt.dev/):
+
+```bash
+make k8s
+```
+
+See [deploy/k8s](deploy/k8s) for the manifest files.
+
+## Features
+
+- **Secure by default** - Automatic TLS via [CertMagic](https://github.com/caddyserver/certmagic)
+- **Observable** - Prometheus metrics, structured logging, pre-built Grafana dashboards
+- **OpenAPI first** - Built-in API documentation and SDK generation
+- **Production ready** - Comprehensive CI/CD pipeline, security scanning, automated releases
+- **Developer friendly** - Easy local setup with Docker Compose, Kubernetes support via Tilt
+
+## Documentation
+
+For comprehensive guides and in-depth documentation, visit the [GitHub Wiki](https://github.com/circa10a/dead-man-switch-api/wiki):
+
+- [Authentik Integration Guide](https://github.com/circa10a/dead-man-switch-api/wiki/Authentik-Integration)
+- [Deployment Guides](https://github.com/circa10a/dead-man-switch-api/wiki/Deployment)
+- [Configuration Reference](https://github.com/circa10a/dead-man-switch-api/wiki/Configuration)
+- [API Examples](https://github.com/circa10a/dead-man-switch-api/wiki/API-Examples)
 
 ## Development
 
 > [!IMPORTANT]
-> Most `make` targets expect [Docker](https://docs.docker.com/engine/install/) to be installed.
+> Most `make` targets require [Docker](https://docs.docker.com/engine/install/) to be installed.
 
-### Start the server
+### Start Local Server
 
-```console
-$ make run
+```bash
+make run
+```
+
+```
 2024-10-26T19:09:03-07:00 INFO <server/server.go:118> Starting server on :8080 component=server
 ```
 
-### Default routes
+### Run Tests
 
-|                            |                                                     |
-|----------------------------|-----------------------------------------------------|
-| Endpoint                   | Descripton                                          |
-| `localhost:8080/v1/docs`   | OpenAPI documentation                               |
-| `localhost:8080/v1/health` | Health status                                       |
-| `localhost:8080/metrics`   | Prometheus metrics (if server is started with `-m`) |
-
-### Adding routes
-
-Routes are created in `internal/server/server.go` with API handlers in `internal/server/handlers/handlers.go`.
-
-### Generate OpenAPI documentation
-
-Simply add your API spec to `api/openapi.yaml` then run `make docs`. The OpenAPI documentation will then be embed in the application and will be accessible at the `http://localhost:8080/docs` endpoint.
-
-### Generate Client SDK
-
-Once your API documention is added to `api/openapi.yaml`, just run `make sdk` and a generated client sdk will be output to the `api` package.
-
-## Docker compose
-
-The local docker compose stack sets up a full observability stack for testing. Run the following the start the stack:
-
-```console
-$ make docker-compose
+```bash
+make test
 ```
 
-The following services will then be accessible with a pre-configured dashboard:
+## License
 
-- Go server: http://localhost:8080
-- [Grafana](https://grafana.com/): http://localhost:3000
-- [Prometheus](https://prometheus.io/): http://localhost:9090
-- [Loki](https://grafana.com/oss/loki/)
-- [Promtail](https://grafana.com/docs/loki/latest/send-data/promtail/)
-
-## Kubernetes
-
-> [!NOTE]
-> Requires [Tilt](https://tilt.dev/) to be installed and local kubernetes context to be configured.
->
-> This has only been tested on MacOS using Docker for Mac's Kubernetes integration.
-
-```console
-$ make k8s
-```
-
-This will deploy the service to kubernetes and make it available at http://localhost:8080
-# dead-mans-switch
+[See LICENSE file](LICENSE)

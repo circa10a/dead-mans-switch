@@ -162,11 +162,19 @@
                     <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
                             <div class="flex items-center gap-2">
-                                <button type="button" x-show="sw.status === 'failed'" @click="openFailureModal(sw)" 
-                                    :title="sw.failureReason ? 'Click to view failure reason' : 'No failure reason available'"
-                                    class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border text-red-500 bg-red-500/10 border-red-500/20 transition-all hover:bg-red-500/20 active:scale-95 cursor-pointer"
-                                    x-text="'Failed'">
-                                </button>
+                                <template x-if="sw.status === 'failed'">
+                                    <div class="flex items-center gap-1">
+                                        <span class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border text-red-500 bg-red-500/10 border-red-500/20">Failed</span>
+                                        <button type="button" @click="openFailureModal(sw)"
+                                            :title="sw.failureReason ? 'Click to view failure reason' : 'No failure reason available'"
+                                            class="text-red-500 hover:text-red-600 dark:hover:text-red-400 transition-colors p-0.5 flex items-center justify-center active:scale-90"
+                                            aria-label="View failure reason">
+                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </template>
                                 <span x-show="sw.status !== 'failed'"
                                     :class="sw.status === 'disabled' ? 'text-gray-500 bg-gray-500/10 border-gray-500/20' : 
                                     (sw.status === 'triggered' ? 'text-red-500 bg-red-500/10 border-red-500/20' : 
@@ -273,7 +281,6 @@
             x-transition:enter-start="translate-y-full sm:scale-95"
             class="relative w-full max-w-lg bg-white dark:bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-gray-200 dark:border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 bg-red-300 rounded-lg"></div>
                 <div>
                     <h3 class="text-lg font-black text-gray-900 dark:text-white">Failure Reason</h3>
                     <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-medium" x-text="selectedFailureSw?.message"></p>
@@ -444,7 +451,11 @@
 
                 async init() {
                     // Setup Connection Listeners
-                    window.addEventListener('online', () => { this.isOnline = true; this.getSw(); });
+                    window.addEventListener('online', async () => {
+                        // Add small delay to ensure server is ready
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await this.getSw();
+                    });
                     window.addEventListener('offline', () => { this.isOnline = false; });
 
                     // Fetch VAPID Key from server
@@ -614,14 +625,21 @@
 
                     const currentSub = await this.getSubscription();
 
-                    await fetch(`${this.baseUrl}/switch/${id}/reset`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ pushSubscription: currentSub })
-                    });
+                    try {
+                        const response = await fetch(`${this.baseUrl}/switch/${id}/reset`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ pushSubscription: currentSub })
+                        });
 
-                    await this.getSw();
-                    setTimeout(() => { this.resettingId = null; }, 1000);
+                        if (!response.ok) throw new Error("Reset failed");
+
+                        await this.getSw();
+                        setTimeout(() => { this.resettingId = null; }, 1000);
+                    } catch (e) {
+                        console.error("Reset failed:", e);
+                        this.resettingId = null;
+                    }
                 },
 
                 async saveSw() {

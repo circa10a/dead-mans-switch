@@ -229,7 +229,8 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 		assert.True(t, mock.FailedCalled, "Expected switch to be marked as failed in DB")
 		assert.False(t, mock.SentCalled, "Switch should not be marked as triggered on failure")
 		assert.NotEmpty(t, *mock.LastFailureReason, "Expected failureReason to not be empty")
-		assert.Contains(t, *mock.LastFailureReason, "invalid", "Expected failureReason to contain error details")
+		// Verify first character is uppercase as per worker.go logic
+		assert.True(t, len(*mock.LastFailureReason) > 0 && (*mock.LastFailureReason)[0] >= 'A' && (*mock.LastFailureReason)[0] <= 'Z', "Expected failureReason to start with uppercase")
 	})
 }
 

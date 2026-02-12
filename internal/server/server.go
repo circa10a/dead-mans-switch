@@ -187,14 +187,14 @@ func New(cfg *Config) (*Server, error) {
 	validator := validator.New()
 
 	// API docs
-	router.Route("/docs", func(r chi.Router) {
+	router.Route("/v1/docs", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write(publicAPIDocs)
+		})
 		r.Get("/internal", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "text/html")
 			_, _ = w.Write(internalAPIDocs)
-		})
-		r.Get("/public", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html")
-			_, _ = w.Write(publicAPIDocs)
 		})
 	})
 
