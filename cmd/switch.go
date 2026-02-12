@@ -272,6 +272,26 @@ var resetSwitchCmd = &cobra.Command{
 	},
 }
 
+var disableSwitchCmd = &cobra.Command{
+	Use:   "disable [id]",
+	Short: "Disable a dead man switch",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var id int
+		_, err := fmt.Sscanf(args[0], "%d", &id)
+		if err != nil {
+			return err
+		}
+
+		resp, err := client.PostSwitchIdDisableWithResponse(context.Background(), id)
+		if err != nil {
+			return err
+		}
+		dumpResponse(cmd, resp.StatusCode(), resp.Body, resp.JSON200)
+		return nil
+	},
+}
+
 func init() {
 	switchCmd.PersistentFlags().StringVarP(&apiURL, "url", "u", "http://localhost:8080/api/v1", "API base URL")
 	switchCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "json", "Output format (json, yaml)")
@@ -288,6 +308,6 @@ func init() {
 	_ = createSwitchCmd.MarkFlagRequired("message")
 	_ = createSwitchCmd.MarkFlagRequired("notifiers")
 
-	switchCmd.AddCommand(getSwitchesCmd, createSwitchCmd, updateSwitchCmd, deleteSwitchCmd, resetSwitchCmd)
+	switchCmd.AddCommand(getSwitchesCmd, createSwitchCmd, updateSwitchCmd, deleteSwitchCmd, resetSwitchCmd, disableSwitchCmd)
 	rootCmd.AddCommand(switchCmd)
 }

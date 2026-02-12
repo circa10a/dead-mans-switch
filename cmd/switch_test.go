@@ -83,3 +83,23 @@ func Test_ResetCommand(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, output, `"id": 1`)
 }
+func Test_DisableCommand(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/switch/1/disable", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		id := 1
+		status := api.SwitchStatusDisabled
+		_ = json.NewEncoder(w).Encode(api.Switch{
+			Id:     &id,
+			Status: &status,
+		})
+	}))
+	defer server.Close()
+
+	output, err := executeCommand("switch", "disable", "1", "--url", server.URL, "--color=false")
+
+	assert.NoError(t, err)
+	assert.Contains(t, output, `"id": 1`)
+	assert.Contains(t, output, `"status": "disabled"`)
+}
