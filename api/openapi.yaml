@@ -294,6 +294,10 @@ components:
         encrypted:
           type: boolean
           description: "Where or not to encrypt switch data. Data will no longer be readable via the API"
+        failureReason:
+          type: string
+          description: "Reason for failure when status is failed"
+          readOnly: true
         message:
           type: string
           example: Alert!

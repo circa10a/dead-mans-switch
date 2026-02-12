@@ -26,7 +26,7 @@ import (
 const (
 	sqliteDBName = "switches_sqlite.db"
 	// switchColumns centralizes the field list to prevent Scan errors
-	switchColumns = `id, check_in_interval, delete_after_triggered, encrypted, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at`
+	switchColumns = `id, check_in_interval, delete_after_triggered, encrypted, failure_reason, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at`
 )
 
 // SQLiteStore is an implementation of the Store interface for SQLite.
@@ -103,13 +103,14 @@ func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
 		}
 	}
 
-	query := `INSERT INTO switches (check_in_interval, delete_after_triggered, encrypted, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO switches (check_in_interval, delete_after_triggered, encrypted, failure_reason, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	res, err := s.db.Exec(query,
 		sw.CheckInInterval,
 		sw.DeleteAfterTriggered != nil && *sw.DeleteAfterTriggered,
 		sw.Encrypted != nil && *sw.Encrypted,
+		sw.FailureReason,
 		sw.Message,
 		notifiers,
 		pushSubscription,
@@ -247,13 +248,14 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		}
 	}
 
-	query := `UPDATE switches SET check_in_interval=?, delete_after_triggered=?, encrypted=?, message=?, notifiers=?, push_subscription=?, reminder_enabled=?, reminder_sent=?, reminder_threshold=?, status=?, trigger_at=? WHERE id=?`
+	query := `UPDATE switches SET check_in_interval=?, delete_after_triggered=?, encrypted=?, failure_reason=?, message=?, notifiers=?, push_subscription=?, reminder_enabled=?, reminder_sent=?, reminder_threshold=?, status=?, trigger_at=? WHERE id=?`
 
 	res, err := s.db.Exec(
 		query,
 		sw.CheckInInterval,
 		sw.DeleteAfterTriggered != nil && *sw.DeleteAfterTriggered,
 		sw.Encrypted != nil && *sw.Encrypted,
+		sw.FailureReason,
 		sw.Message,
 		notifiers,
 		pushSubscription,
@@ -319,6 +321,7 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		var pushRaw sql.NullString
 		var DeleteAfterTriggered sql.NullBool
 		var encrypted sql.NullBool
+		var failureReasonRaw sql.NullString
 		var reminderEnabled sql.NullBool
 		var reminderThresholdRaw sql.NullString
 		var reminderSent sql.NullBool
@@ -328,6 +331,7 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 			&sw.CheckInInterval,
 			&DeleteAfterTriggered,
 			&encrypted,
+			&failureReasonRaw,
 			&msgRaw,
 			&notifiersRaw,
 			&pushRaw,
@@ -347,6 +351,9 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		}
 		if encrypted.Valid {
 			sw.Encrypted = &encrypted.Bool
+		}
+		if failureReasonRaw.Valid {
+			sw.FailureReason = &failureReasonRaw.String
 		}
 		if reminderEnabled.Valid {
 			sw.ReminderEnabled = &reminderEnabled.Bool

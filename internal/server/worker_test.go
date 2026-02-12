@@ -21,6 +21,7 @@ type MockStore struct {
 	FailedCalled           bool
 	MarkReminderSentCalled bool
 	SentCalled             bool
+	LastFailureReason      *string
 }
 
 // Interface methods
@@ -62,6 +63,7 @@ func (m *MockStore) Update(id int, sw api.Switch) (api.Switch, error) {
 
 	if *sw.Status == api.SwitchStatusFailed {
 		m.FailedCalled = true
+		m.LastFailureReason = sw.FailureReason
 	}
 
 	return sw, nil
@@ -226,6 +228,8 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 
 		assert.True(t, mock.FailedCalled, "Expected switch to be marked as failed in DB")
 		assert.False(t, mock.SentCalled, "Switch should not be marked as triggered on failure")
+		assert.NotEmpty(t, *mock.LastFailureReason, "Expected failureReason to not be empty")
+		assert.Contains(t, *mock.LastFailureReason, "invalid", "Expected failureReason to contain error details")
 	})
 }
 

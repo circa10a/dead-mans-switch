@@ -186,6 +186,18 @@ func New(cfg *Config) (*Server, error) {
 
 	validator := validator.New()
 
+	// API docs
+	router.Route("/docs", func(r chi.Router) {
+		r.Get("/internal", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write(internalAPIDocs)
+		})
+		r.Get("/public", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write(publicAPIDocs)
+		})
+	})
+
 	// Mount API v1 routes
 	router.Route("/api/v1", func(r chi.Router) {
 		// Group routes that require the validation middlewares
@@ -195,18 +207,6 @@ func New(cfg *Config) (*Server, error) {
 
 			r.Post("/switch", switchHandler.PostHandleFunc)
 			r.Put("/switch/{id}", switchHandler.PutByIDHandleFunc)
-		})
-
-		// API docs
-		r.Route("/docs", func(r chi.Router) {
-			r.Get("/internal", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/html")
-				_, _ = w.Write(internalAPIDocs)
-			})
-			r.Get("/public", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/html")
-				_, _ = w.Write(publicAPIDocs)
-			})
 		})
 
 		// Standard routes (No body validation needed)

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS switches (
     check_in_interval TEXT NOT NULL,
     delete_after_triggered BOOLEAN DEFAULT 0,
     encrypted BOOLEAN DEFAULT 0,
+    failure_reason TEXT,
     message TEXT NOT NULL,
     notifiers TEXT NOT NULL,
     push_subscription TEXT,

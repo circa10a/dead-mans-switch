@@ -94,6 +94,8 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 		if sw.Status == nil || *sw.Status != api.SwitchStatusFailed {
 			statusFailed := api.SwitchStatusFailed
 			sw.Status = &statusFailed
+			failureMsg := sendErr.Error()
+			sw.FailureReason = &failureMsg
 
 			_, err := w.Store.Update(*sw.Id, sw)
 			if err != nil {

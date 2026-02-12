@@ -162,13 +162,18 @@
                     <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
                             <div class="flex items-center gap-2">
-                                <span
+                                <button type="button" x-show="sw.status === 'failed'" @click="openFailureModal(sw)" 
+                                    :title="sw.failureReason ? 'Click to view failure reason' : 'No failure reason available'"
+                                    class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border text-red-500 bg-red-500/10 border-red-500/20 transition-all hover:bg-red-500/20 active:scale-95 cursor-pointer"
+                                    x-text="'Failed'">
+                                </button>
+                                <span x-show="sw.status !== 'failed'"
                                     :class="sw.status === 'disabled' ? 'text-gray-500 bg-gray-500/10 border-gray-500/20' : 
-                                    (sw.status === 'triggered' || sw.status === 'failed' ? 'text-red-500 bg-red-500/10 border-red-500/20' : 
+                                    (sw.status === 'triggered' ? 'text-red-500 bg-red-500/10 border-red-500/20' : 
                                     (isPending(sw) ? 'text-amber-500 bg-amber-500/10 border-amber-500/20' : 
                                     (isExpiringSoon(sw.triggerAt) ? 'text-orange-500 bg-orange-500/10 border-orange-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20')))"
                                     class="text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border"
-                                    x-text="sw.status === 'disabled' ? 'Disabled' : (sw.status === 'triggered' ? 'Triggered' : (sw.status === 'failed' ? 'Failed' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.triggerAt) ? 'Soon' : 'Active'))))">
+                                    x-text="sw.status === 'disabled' ? 'Disabled' : (sw.status === 'triggered' ? 'Triggered' : (isPending(sw) ? 'Pending' : (isExpiringSoon(sw.triggerAt) ? 'Soon' : 'Active')))">
                                 </span>
 
                                 <template x-if="isReminderEnabled(sw)">
@@ -260,6 +265,27 @@
             </template>
         </div>
     </main>
+
+    <div x-show="failureModalOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div x-show="failureModalOpen" x-transition.opacity @click="failureModalOpen = false"
+            class="fixed inset-0 bg-gray-900/50 dark:bg-black/90 backdrop-blur-sm"></div>
+        <div x-show="failureModalOpen" x-transition:enter="transition ease-out duration-300 transform"
+            x-transition:enter-start="translate-y-full sm:scale-95"
+            class="relative w-full max-w-lg bg-white dark:bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-gray-200 dark:border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 bg-red-300 rounded-lg"></div>
+                <div>
+                    <h3 class="text-lg font-black text-gray-900 dark:text-white">Failure Reason</h3>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-medium" x-text="selectedFailureSw?.message"></p>
+                </div>
+                <button type="button" @click="failureModalOpen = false"
+                    class="ml-auto text-gray-500 text-xs font-bold uppercase">Close</button>
+            </div>
+            <div class="bg-red-500/5 border border-red-500/10 rounded-2xl p-5 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                <p x-text="selectedFailureSw?.failureReason || 'No failure reason available'" class="whitespace-pre-wrap break-words"></p>
+            </div>
+        </div>
+    </div>
 
     <div x-show="openModal" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
         <div x-show="openModal" x-transition.opacity @click="openModal = false"
@@ -366,6 +392,7 @@
                 sw: null,
                 switches: [],
                 baseUrl: '/api/v1', switches: [], openModal: false, editingId: null, now: Date.now(), resettingId: null,
+                failureModalOpen: false, selectedFailureSw: null,
                 isOnline: navigator.onLine,
                 isSecure: window.isSecureContext || window.location.protocol === 'https:',
                 showInsecureWarning: true,
@@ -541,6 +568,11 @@
                         pushSubscription: sw.pushSubscription
                     };
                     this.openModal = true;
+                },
+
+                openFailureModal(sw) {
+                    this.selectedFailureSw = sw;
+                    this.failureModalOpen = true;
                 },
 
                 async deleteSw(id) {
