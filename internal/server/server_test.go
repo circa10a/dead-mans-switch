@@ -149,6 +149,42 @@ func TestServerConfigOpts(t *testing.T) {
 		}
 	})
 
+	t.Run("DemoMode", func(t *testing.T) {
+		v := true
+		cfg := &Config{
+			DemoMode:   v,
+			StorageDir: tmpDir,
+			Validation: false,
+		}
+
+		s, err := New(cfg)
+		if err != nil {
+			t.Errorf("received unexpected err: %s", err.Error())
+		}
+
+		if s.DemoMode != v {
+			t.Errorf(outputStr, s.DemoMode, v)
+		}
+	})
+
+	t.Run("DemoResetInterval", func(t *testing.T) {
+		v := 10 * time.Second
+		cfg := &Config{
+			DemoResetInterval: v,
+			StorageDir:        tmpDir,
+			Validation:        false,
+		}
+
+		s, err := New(cfg)
+		if err != nil {
+			t.Errorf("received unexpected err: %s", err.Error())
+		}
+
+		if s.DemoResetInterval != v {
+			t.Errorf(outputStr, s.DemoResetInterval, v)
+		}
+	})
+
 	t.Run("Domains", func(t *testing.T) {
 		v := []string{"lemon"}
 		cfg := &Config{

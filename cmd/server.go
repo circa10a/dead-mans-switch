@@ -19,18 +19,20 @@ import (
 
 // Constants for Viper keys and Flag names
 const (
-	autoTLSKey         = "auto-tls"
-	contactEmailKey    = "contact-email"
-	domainsKey         = "domains"
-	logFormatKey       = "log-format"
-	logLevelKey        = "log-level"
-	metricsKey         = "metrics"
-	portKey            = "port"
-	storageDirKey      = "storage-dir"
-	tlsCertificateKey  = "tls-certificate"
-	tlsKeyKey          = "tls-key"
-	workerBatchSizeKey = "worker-batch-size"
-	workerIntervalKey  = "worker-interval"
+	autoTLSKey            = "auto-tls"
+	contactEmailKey       = "contact-email"
+	demoModeKey           = "demo-mode"
+	demoPResetIntervalKey = "demo-reset-interval"
+	domainsKey            = "domains"
+	logFormatKey          = "log-format"
+	logLevelKey           = "log-level"
+	metricsKey            = "metrics"
+	portKey               = "port"
+	storageDirKey         = "storage-dir"
+	tlsCertificateKey     = "tls-certificate"
+	tlsKeyKey             = "tls-key"
+	workerBatchSizeKey    = "worker-batch-size"
+	workerIntervalKey     = "worker-interval"
 )
 
 // serverCmd represents the server command
@@ -40,19 +42,21 @@ var serverCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Build server configuration using the constants
 		cfg := &server.Config{
-			AutoTLS:         viper.GetBool(autoTLSKey),
-			ContactEmail:    viper.GetString(contactEmailKey),
-			Domains:         viper.GetStringSlice(domainsKey),
-			LogFormat:       viper.GetString(logFormatKey),
-			LogLevel:        viper.GetString(logLevelKey),
-			Metrics:         viper.GetBool(metricsKey),
-			Port:            viper.GetInt(portKey),
-			StorageDir:      viper.GetString(storageDirKey),
-			TLSCert:         viper.GetString(tlsCertificateKey),
-			TLSKey:          viper.GetString(tlsKeyKey),
-			Validation:      true,
-			WorkerBatchSize: viper.GetInt(workerBatchSizeKey),
-			WorkerInterval:  viper.GetDuration(workerIntervalKey),
+			AutoTLS:           viper.GetBool(autoTLSKey),
+			ContactEmail:      viper.GetString(contactEmailKey),
+			DemoMode:          viper.GetBool(demoModeKey),
+			DemoResetInterval: viper.GetDuration(demoPResetIntervalKey),
+			Domains:           viper.GetStringSlice(domainsKey),
+			LogFormat:         viper.GetString(logFormatKey),
+			LogLevel:          viper.GetString(logLevelKey),
+			Metrics:           viper.GetBool(metricsKey),
+			Port:              viper.GetInt(portKey),
+			StorageDir:        viper.GetString(storageDirKey),
+			TLSCert:           viper.GetString(tlsCertificateKey),
+			TLSKey:            viper.GetString(tlsKeyKey),
+			Validation:        true,
+			WorkerBatchSize:   viper.GetInt(workerBatchSizeKey),
+			WorkerInterval:    viper.GetDuration(workerIntervalKey),
 		}
 
 		server, err := server.New(cfg)
@@ -83,6 +87,8 @@ func init() {
 	serverFlags := []flagDef{
 		{Name: autoTLSKey, Shorthand: "a", Type: "bool", Default: false, Usage: "Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation.", ViperKey: autoTLSKey},
 		{Name: contactEmailKey, Shorthand: "", Type: "string", Default: "user@dead-mans-switch.com", Usage: "Email used for TLS cert registration + push notification point of contact (not required).", ViperKey: contactEmailKey},
+		{Name: demoModeKey, Shorthand: "", Type: "bool", Default: false, Usage: "Enable demo mode which creates sample switches on startup and resets the database periodically.", ViperKey: demoModeKey},
+		{Name: demoPResetIntervalKey, Shorthand: "", Type: "duration", Default: 6 * time.Hour, Usage: "How often to reset the database with fresh sample switches when in demo mode.", ViperKey: demoPResetIntervalKey},
 		{Name: domainsKey, Shorthand: "d", Type: "stringArray", Default: []string{}, Usage: "Domains to issue certificate for. Must be used with --auto-tls.", ViperKey: domainsKey},
 		{Name: logFormatKey, Shorthand: "f", Type: "string", Default: "text", Usage: "Server logging format. Supported values are 'text' and 'json'.", ViperKey: logFormatKey},
 		{Name: logLevelKey, Shorthand: "l", Type: "string", Default: "info", Usage: "Server logging level.", ViperKey: logLevelKey},

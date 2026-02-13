@@ -57,19 +57,21 @@ type Server struct {
 
 // Config holds configuration for creating a Server.
 type Config struct {
-	AutoTLS         bool
-	ContactEmail    string
-	Domains         []string
-	LogFormat       string
-	LogLevel        string
-	Metrics         bool
-	Port            int
-	StorageDir      string
-	TLSCert         string
-	TLSKey          string
-	Validation      bool
-	WorkerBatchSize int
-	WorkerInterval  time.Duration
+	AutoTLS           bool
+	ContactEmail      string
+	DemoMode          bool
+	DemoResetInterval time.Duration
+	Domains           []string
+	LogFormat         string
+	LogLevel          string
+	Metrics           bool
+	Port              int
+	StorageDir        string
+	TLSCert           string
+	TLSKey            string
+	Validation        bool
+	WorkerBatchSize   int
+	WorkerInterval    time.Duration
 }
 
 // New returns a new server configured from cfg.
@@ -142,6 +144,14 @@ func New(cfg *Config) (*Server, error) {
 
 	// Server serves the key
 	server.VAPIDPublicKey = pub
+
+	// Demo mode
+	if server.DemoMode {
+		err = server.initDemoMode(db)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize demo mode: %w", err)
+		}
+	}
 
 	// Worker
 	server.Worker = &Worker{
