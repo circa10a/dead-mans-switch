@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/circa10a/dead-mans-switch/api"
-	"github.com/stretchr/testify/assert"
 )
 
 // MockStore satisfies the database.Store interface
@@ -111,8 +110,12 @@ func TestWorker_Sweep_Success(t *testing.T) {
 		w := &Worker{Store: mock, BatchSize: 10, Logger: logger}
 		w.sweep()
 
-		assert.True(t, mock.SentCalled)
-		assert.False(t, mock.DeletedCalled)
+		if !mock.SentCalled {
+			t.Error("expected SentCalled to be true")
+		}
+		if mock.DeletedCalled {
+			t.Error("expected DeletedCalled to be false")
+		}
 	})
 }
 
@@ -154,7 +157,9 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 
 		// Since we didn't provide valid VAPID keys, sendWebPush fails, so MarkReminderSent shouldn't be called.
 		// To truly test success here, we would need to mock the webpush client, but verifying the logic window is key:
-		assert.False(t, mock.MarkReminderSentCalled, "Should not mark sent because VAPID keys were missing/invalid")
+		if mock.MarkReminderSentCalled {
+			t.Error("Should not mark sent because VAPID keys were missing/invalid")
+		}
 	})
 
 	t.Run("should NOT process reminder if outside warning window", func(t *testing.T) {
@@ -171,7 +176,9 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 		w := &Worker{Store: mock, BatchSize: 10, Logger: logger}
 		w.sweep()
 
-		assert.False(t, mock.MarkReminderSentCalled)
+		if mock.MarkReminderSentCalled {
+			t.Error("expected MarkReminderSentCalled to be false")
+		}
 	})
 }
 
@@ -199,7 +206,9 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 
 		// Because one notifier failed, the aggregate error should have prevented
 		// the database from being updated to "Sent".
-		assert.False(t, mock.SentCalled, "Should not mark as triggered if any notifier in the list fails")
+		if mock.SentCalled {
+			t.Error("Should not mark as triggered if any notifier in the list fails")
+		}
 	})
 
 	t.Run("should mark as failed if sending fails", func(t *testing.T) {
@@ -226,11 +235,18 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 
 		w.sweep()
 
-		assert.True(t, mock.FailedCalled, "Expected switch to be marked as failed in DB")
-		assert.False(t, mock.SentCalled, "Switch should not be marked as triggered on failure")
-		assert.NotEmpty(t, *mock.LastFailureReason, "Expected failureReason to not be empty")
-		// Verify first character is uppercase as per worker.go logic
-		assert.True(t, len(*mock.LastFailureReason) > 0 && (*mock.LastFailureReason)[0] >= 'A' && (*mock.LastFailureReason)[0] <= 'Z', "Expected failureReason to start with uppercase")
+		if !mock.FailedCalled {
+			t.Error("Expected switch to be marked as failed in DB")
+		}
+		if mock.SentCalled {
+			t.Error("Switch should not be marked as triggered on failure")
+		}
+		if mock.LastFailureReason == nil || *mock.LastFailureReason == "" {
+			t.Error("Expected failureReason to not be empty")
+		}
+		if mock.LastFailureReason == nil || len(*mock.LastFailureReason) == 0 || (*mock.LastFailureReason)[0] < 'A' || (*mock.LastFailureReason)[0] > 'Z' {
+			t.Error("Expected failureReason to start with uppercase")
+		}
 	})
 }
 
@@ -246,7 +262,9 @@ func TestSendWebPush_ReturnsNilWhenSubscriptionIsNil(t *testing.T) {
 		}
 
 		err := w.sendWebPush(sw, "Test Title", "Test Body")
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 	})
 
 	t.Run("returns nil when PushSubscription.Endpoint is nil", func(t *testing.T) {
@@ -258,7 +276,9 @@ func TestSendWebPush_ReturnsNilWhenSubscriptionIsNil(t *testing.T) {
 		}
 
 		err := w.sendWebPush(sw, "Test Title", "Test Body")
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 	})
 }
 

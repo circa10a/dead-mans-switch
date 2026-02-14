@@ -5,29 +5,34 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/circa10a/dead-mans-switch/api"
 )
 
 func TestAuthGetConfigHandleFunc(t *testing.T) {
+	audience := "my-client-id"
+	issuer := "http://localhost:9000/application/o/dead-mans-switch/"
+
 	tests := []struct {
 		name             string
-		handler          *Auth
+		cfg              api.AuthConfig
 		expectedAudience string
 		expectedEnabled  bool
 		expectedIssuer   string
 	}{
 		{
 			name: "auth disabled",
-			handler: &Auth{
+			cfg: api.AuthConfig{
 				Enabled: false,
 			},
 			expectedEnabled: false,
 		},
 		{
 			name: "auth enabled with issuer and audience",
-			handler: &Auth{
-				Audience:  "my-client-id",
+			cfg: api.AuthConfig{
+				Audience:  &audience,
 				Enabled:   true,
-				IssuerURL: "http://localhost:9000/application/o/dead-mans-switch/",
+				IssuerUrl: &issuer,
 			},
 			expectedAudience: "my-client-id",
 			expectedEnabled:  true,
@@ -35,9 +40,9 @@ func TestAuthGetConfigHandleFunc(t *testing.T) {
 		},
 		{
 			name: "auth enabled without audience",
-			handler: &Auth{
+			cfg: api.AuthConfig{
 				Enabled:   true,
-				IssuerURL: "http://localhost:9000/application/o/dead-mans-switch/",
+				IssuerUrl: &issuer,
 			},
 			expectedEnabled: true,
 			expectedIssuer:  "http://localhost:9000/application/o/dead-mans-switch/",
@@ -49,7 +54,8 @@ func TestAuthGetConfigHandleFunc(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/config", nil)
 			rec := httptest.NewRecorder()
 
-			tt.handler.GetConfigHandleFunc(rec, req)
+			handler := AuthConfigHandler(tt.cfg)
+			handler(rec, req)
 
 			if rec.Code != http.StatusOK {
 				t.Errorf("expected status 200, got %d", rec.Code)
@@ -60,7 +66,7 @@ func TestAuthGetConfigHandleFunc(t *testing.T) {
 				t.Errorf("expected Content-Type application/json, got %s", contentType)
 			}
 
-			var resp authConfigResponse
+			var resp api.AuthConfig
 			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}
@@ -69,12 +75,20 @@ func TestAuthGetConfigHandleFunc(t *testing.T) {
 				t.Errorf("expected enabled=%v, got %v", tt.expectedEnabled, resp.Enabled)
 			}
 
-			if resp.IssuerURL != tt.expectedIssuer {
-				t.Errorf("expected issuerUrl=%q, got %q", tt.expectedIssuer, resp.IssuerURL)
+			issuerUrl := ""
+			if resp.IssuerUrl != nil {
+				issuerUrl = *resp.IssuerUrl
+			}
+			if issuerUrl != tt.expectedIssuer {
+				t.Errorf("expected issuerUrl=%q, got %q", tt.expectedIssuer, issuerUrl)
 			}
 
-			if resp.Audience != tt.expectedAudience {
-				t.Errorf("expected audience=%q, got %q", tt.expectedAudience, resp.Audience)
+			audience := ""
+			if resp.Audience != nil {
+				audience = *resp.Audience
+			}
+			if audience != tt.expectedAudience {
+				t.Errorf("expected audience=%q, got %q", tt.expectedAudience, audience)
 			}
 		})
 	}

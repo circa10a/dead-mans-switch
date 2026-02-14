@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/caddyserver/certmagic"
+	"github.com/circa10a/dead-mans-switch/api"
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
 	"github.com/circa10a/dead-mans-switch/internal/server/handlers"
 	"github.com/circa10a/dead-mans-switch/internal/server/middleware"
@@ -207,10 +208,12 @@ func New(cfg *Config) (*Server, error) {
 
 	// Routes
 	// Auth configuration endpoint (unauthenticated so UI can discover OIDC settings)
-	authHandler := &handlers.Auth{
-		Audience:  server.AuthAudience,
-		Enabled:   server.AuthEnabled,
-		IssuerURL: server.AuthIssuerURL,
+	authCfg := api.AuthConfig{
+		Enabled: server.AuthEnabled,
+	}
+	if server.AuthEnabled {
+		authCfg.Audience = &server.AuthAudience
+		authCfg.IssuerUrl = &server.AuthIssuerURL
 	}
 
 	// Health check
@@ -243,7 +246,7 @@ func New(cfg *Config) (*Server, error) {
 	router.Route("/api/v1", func(r chi.Router) {
 		// Unauthenticated routes
 		r.Group(func(r chi.Router) {
-			r.Get("/auth/config", authHandler.GetConfigHandleFunc)
+			r.Get("/auth/config", handlers.AuthConfigHandler(authCfg))
 		})
 
 		// Apply JWT auth middleware to authenticated routes

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestSwitchValidator(t *testing.T) {
@@ -23,7 +22,9 @@ func TestSwitchValidator(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		assert.Equal(t, "test message", sw.Payload.Message)
+		if sw.Payload.Message != "test message" {
+			t.Errorf("expected message %q, got %q", "test message", sw.Payload.Message)
+		}
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -90,7 +91,9 @@ func TestSwitchValidator(t *testing.T) {
 
 			handlerToTest.ServeHTTP(rr, req)
 
-			assert.Equal(t, tt.expectedStatus, rr.Code)
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("expected status %d, got %d", tt.expectedStatus, rr.Code)
+			}
 		})
 	}
 }
@@ -99,7 +102,9 @@ func TestFromContext_Empty(t *testing.T) {
 	// Test that FromContext returns false when the key isn't present
 	req := httptest.NewRequest("GET", "/", nil)
 	_, ok := FromContext(req.Context())
-	assert.False(t, ok, "FromContext should return false for empty context")
+	if ok {
+		t.Error("FromContext should return false for empty context")
+	}
 }
 
 func ptr[T any](v T) *T {

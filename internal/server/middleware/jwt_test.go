@@ -6,18 +6,19 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestJWTAuth(t *testing.T) {
 	// Generate RSA key pair for testing
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	publicKey := &privateKey.PublicKey
 
 	issuerURL := "https://authentik.example.com/application/o/oauth2/"
@@ -73,7 +74,9 @@ func TestJWTAuth(t *testing.T) {
 				token.Header["kid"] = "test-key"
 
 				tokenString, err := token.SignedString(privateKey)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatal(err)
+				}
 				return "Bearer " + tokenString
 			}(),
 			expectedStatus: http.StatusOK,
@@ -93,7 +96,9 @@ func TestJWTAuth(t *testing.T) {
 				token.Header["kid"] = "test-key"
 
 				tokenString, err := token.SignedString(privateKey)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatal(err)
+				}
 				return "Bearer " + tokenString
 			}(),
 			expectedStatus: http.StatusUnauthorized,
@@ -113,7 +118,9 @@ func TestJWTAuth(t *testing.T) {
 				token.Header["kid"] = "test-key"
 
 				tokenString, err := token.SignedString(privateKey)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatal(err)
+				}
 				return "Bearer " + tokenString
 			}(),
 			expectedStatus: http.StatusUnauthorized,
@@ -133,7 +140,9 @@ func TestJWTAuth(t *testing.T) {
 				token.Header["kid"] = "test-key"
 
 				tokenString, err := token.SignedString(privateKey)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatal(err)
+				}
 				return "Bearer " + tokenString
 			}(),
 			expectedStatus: http.StatusUnauthorized,
@@ -152,7 +161,9 @@ func TestJWTAuth(t *testing.T) {
 				})
 
 				tokenString, err := token.SignedString(privateKey)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatal(err)
+				}
 				return "Bearer " + tokenString
 			}(),
 			expectedStatus: http.StatusUnauthorized,
@@ -172,7 +183,9 @@ func TestJWTAuth(t *testing.T) {
 				token.Header["kid"] = "unknown-key"
 
 				tokenString, err := token.SignedString(privateKey)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatal(err)
+				}
 				return "Bearer " + tokenString
 			}(),
 			expectedStatus: http.StatusUnauthorized,
@@ -196,7 +209,9 @@ func TestJWTAuth(t *testing.T) {
 				token.Header["kid"] = "test-key"
 
 				tokenString, err := token.SignedString(privateKey)
-				require.NoError(t, err)
+				if err != nil {
+					t.Fatal(err)
+				}
 				return "Bearer " + tokenString
 			}(),
 			expectedStatus: http.StatusUnauthorized,
@@ -228,9 +243,13 @@ func TestJWTAuth(t *testing.T) {
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, req)
 
-			assert.Equal(t, tt.expectedStatus, w.Code, "unexpected status code")
+			if w.Code != tt.expectedStatus {
+				t.Errorf("unexpected status code: expected %d, got %d", tt.expectedStatus, w.Code)
+			}
 			if tt.expectedBody != "" {
-				assert.Contains(t, w.Body.String(), tt.expectedBody, "unexpected response body")
+				if !strings.Contains(w.Body.String(), tt.expectedBody) {
+					t.Errorf("unexpected response body: expected to contain %q, got %q", tt.expectedBody, w.Body.String())
+				}
 			}
 		})
 	}
@@ -239,7 +258,9 @@ func TestJWTAuth(t *testing.T) {
 func TestJWTAuthWithoutAudience(t *testing.T) {
 	// Generate RSA key pair for testing
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 	publicKey := &privateKey.PublicKey
 
 	issuerURL := "https://authentik.example.com/application/o/oauth2/"
@@ -267,7 +288,9 @@ func TestJWTAuthWithoutAudience(t *testing.T) {
 	token.Header["kid"] = "test-key"
 
 	tokenString, err := token.SignedString(privateKey)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -282,7 +305,9 @@ func TestJWTAuthWithoutAudience(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code, "should pass when audience is empty")
+	if w.Code != http.StatusOK {
+		t.Errorf("should pass when audience is empty: expected %d, got %d", http.StatusOK, w.Code)
+	}
 }
 
 func TestFetchPublicKeys(t *testing.T) {
@@ -385,10 +410,11 @@ func TestFetchPublicKeys(t *testing.T) {
 			defer server.Close()
 
 			_, err := FetchPublicKeys(server.URL)
-			if tt.expectedError {
-				assert.Error(t, err, "expected error")
-			} else {
-				assert.NoError(t, err, "unexpected error")
+			if tt.expectedError && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tt.expectedError && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}
@@ -428,10 +454,16 @@ func TestDecodeBase64URL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := decodeBase64URL(tt.input)
 			if tt.expectedErr {
-				assert.Error(t, err, "expected error")
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
 			} else {
-				assert.NoError(t, err, "unexpected error")
-				assert.True(t, tt.checkOutput(result), "output check failed")
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if !tt.checkOutput(result) {
+					t.Error("output check failed")
+				}
 			}
 		})
 	}
@@ -471,10 +503,11 @@ func TestJWKToRSAPublicKey(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := jwkToRSAPublicKey(tt.jwk)
-			if tt.expectedErr {
-				assert.Error(t, err, "expected error")
-			} else {
-				assert.NoError(t, err, "unexpected error")
+			if tt.expectedErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tt.expectedErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}

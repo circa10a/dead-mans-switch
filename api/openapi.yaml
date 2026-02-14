@@ -307,6 +307,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /auth/config:
+    get:
+      summary: Get authentication configuration
+      description: Returns the OIDC authentication configuration so the UI can discover settings. This endpoint is unauthenticated.
+      responses:
+        '200':
+          description: Authentication configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthConfig'
 
 components:
   securitySchemes:
@@ -316,6 +327,21 @@ components:
       bearerFormat: JWT
       description: JWT token obtained from Authentik OAuth2 provider
   schemas:
+    AuthConfig:
+      type: object
+      description: "Authentication configuration returned to the UI for OIDC discovery"
+      required:
+        - enabled
+      properties:
+        audience:
+          type: string
+          description: "OIDC client ID / audience"
+        enabled:
+          type: boolean
+          description: "Whether authentication is enabled"
+        issuerUrl:
+          type: string
+          description: "OIDC issuer URL"
     Error:
       type: object
       description: "Includes http status code and reason for error"

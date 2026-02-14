@@ -34,6 +34,18 @@ const (
 	SwitchStatusTriggered SwitchStatus = "triggered"
 )
 
+// AuthConfig Authentication configuration returned to the UI for OIDC discovery
+type AuthConfig struct {
+	// Audience OIDC client ID / audience
+	Audience *string `json:"audience,omitempty"`
+
+	// Enabled Whether authentication is enabled
+	Enabled bool `json:"enabled"`
+
+	// IssuerUrl OIDC issuer URL
+	IssuerUrl *string `json:"issuerUrl,omitempty"`
+}
+
 // Error Includes http status code and reason for error
 type Error struct {
 	Code    int    `json:"code"`
@@ -188,6 +200,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// GetAuthConfig request
+	GetAuthConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetHealth request
 	GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -218,6 +233,18 @@ type ClientInterface interface {
 
 	// GetVapid request
 	GetVapid(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) GetAuthConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuthConfigRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) GetHealth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -350,6 +377,33 @@ func (c *Client) GetVapid(ctx context.Context, reqEditors ...RequestEditorFn) (*
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewGetAuthConfigRequest generates requests for GetAuthConfig
+func NewGetAuthConfigRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/auth/config")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewGetHealthRequest generates requests for GetHealth
@@ -721,6 +775,9 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// GetAuthConfigWithResponse request
+	GetAuthConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthConfigResponse, error)
+
 	// GetHealthWithResponse request
 	GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error)
 
@@ -751,6 +808,28 @@ type ClientWithResponsesInterface interface {
 
 	// GetVapidWithResponse request
 	GetVapidWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVapidResponse, error)
+}
+
+type GetAuthConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AuthConfig
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuthConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuthConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type GetHealthResponse struct {
@@ -972,6 +1051,15 @@ func (r GetVapidResponse) StatusCode() int {
 	return 0
 }
 
+// GetAuthConfigWithResponse request returning *GetAuthConfigResponse
+func (c *ClientWithResponses) GetAuthConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuthConfigResponse, error) {
+	rsp, err := c.GetAuthConfig(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuthConfigResponse(rsp)
+}
+
 // GetHealthWithResponse request returning *GetHealthResponse
 func (c *ClientWithResponses) GetHealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetHealthResponse, error) {
 	rsp, err := c.GetHealth(ctx, reqEditors...)
@@ -1067,6 +1155,32 @@ func (c *ClientWithResponses) GetVapidWithResponse(ctx context.Context, reqEdito
 		return nil, err
 	}
 	return ParseGetVapidResponse(rsp)
+}
+
+// ParseGetAuthConfigResponse parses an HTTP response from a GetAuthConfigWithResponse call
+func ParseGetAuthConfigResponse(rsp *http.Response) (*GetAuthConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthConfig
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseGetHealthResponse parses an HTTP response from a GetHealthWithResponse call

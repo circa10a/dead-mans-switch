@@ -26,7 +26,6 @@ Do not introduce alternatives to these without discussion:
 | `go-chi/chi` | HTTP router |
 | `spf13/cobra` + `spf13/viper` | CLI + config (env vars use `DEAD_MANS_SWITCH_` prefix) |
 | `charmbracelet/log` | slog handler (text/JSON output) |
-| `stretchr/testify` | Test assertions (`assert`, `require`) |
 | `modernc.org/sqlite` | Pure-Go SQLite (no CGO) |
 | `nicholas-fedor/shoutrrr` | Multi-provider notifications |
 | `go-playground/validator` | Request body validation |
@@ -75,7 +74,7 @@ All code introduced should pass `golangci-lint run -v` without error. Should err
 When creating new features, ensure:
 - [ ] Error handling follows the next-line rule with `%w` wrapping
 - [ ] Unit tests exist for all code paths (happy path, error cases, edge cases)
-- [ ] `testify/assert` and `testify/require` used for assertions
+- [ ] Standard library `t.Error()`, `t.Errorf()`, and `t.Fatal()` used for assertions
 - [ ] Config struct fields and flag definitions are alphabetically sorted
 - [ ] Code compiles and all existing tests still pass
 - [ ] No manual edits to generated files
@@ -175,7 +174,7 @@ Web assets and API docs are compiled into the binary via `//go:embed`. After cha
 
 - Place tests in `*_test.go` files alongside the code
 - Use table-driven tests with `t.Run()` subtests
-- Use `testify/assert` and `testify/require` for assertions
+- Use standard library `t.Error()` and `t.Errorf()` for tests instead of an external library
 - Use `t.Helper()` in setup functions (e.g., `setupTestHandler(t)`)
 
 ### Test Infrastructure
@@ -211,13 +210,12 @@ func TestNewFeature(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := NewFeature(tt.input)
-			if tt.expectErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+			if tt.expectErr && err != nil {
+				t.Error(t, err)
 			}
-			assert.Equal(t, tt.expected, result)
-		})
+			if input != expected {
+				t.Errorf("expected '%s', got %s", expected, input)
+			}
 	}
 }
 

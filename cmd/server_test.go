@@ -9,7 +9,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 )
 
 func setupViper() {
@@ -42,12 +41,22 @@ func TestServerFlags(t *testing.T) {
 
 	// We use serverCmd directly to avoid issues with other commands
 	err := serverCmd.ParseFlags(args)
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("unexpected error parsing flags: %v", err)
+	}
 
-	assert.Equal(t, 9090, viper.GetInt(portKey))
-	assert.Equal(t, "debug", viper.GetString(logLevelKey))
-	assert.True(t, viper.GetBool(metricsKey))
-	assert.Equal(t, 10*time.Second, viper.GetDuration(workerIntervalKey))
+	if got := viper.GetInt(portKey); got != 9090 {
+		t.Errorf("expected port 9090, got %d", got)
+	}
+	if got := viper.GetString(logLevelKey); got != "debug" {
+		t.Errorf("expected log-level %q, got %q", "debug", got)
+	}
+	if got := viper.GetBool(metricsKey); !got {
+		t.Error("expected metrics to be true")
+	}
+	if got := viper.GetDuration(workerIntervalKey); got != 10*time.Second {
+		t.Errorf("expected worker-interval %v, got %v", 10*time.Second, got)
+	}
 }
 
 func TestServerEnvVariables(t *testing.T) {
@@ -64,8 +73,12 @@ func TestServerEnvVariables(t *testing.T) {
 	// In some versions of viper, you must call this again after setting env vars
 	viper.AutomaticEnv()
 
-	assert.Equal(t, 1234, viper.GetInt(portKey))
-	assert.Equal(t, "warn", viper.GetString(logLevelKey))
+	if got := viper.GetInt(portKey); got != 1234 {
+		t.Errorf("expected port 1234, got %d", got)
+	}
+	if got := viper.GetString(logLevelKey); got != "warn" {
+		t.Errorf("expected log-level %q, got %q", "warn", got)
+	}
 }
 
 func TestServerSignalExit(t *testing.T) {
@@ -92,7 +105,9 @@ func TestServerSignalExit(t *testing.T) {
 
 	select {
 	case err := <-errChan:
-		assert.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Server command did not exit after SIGTERM")
 	}
