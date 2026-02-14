@@ -2,6 +2,11 @@ services:
   dead-mans-switch:
     container_name: circa10a/dead-mans-switch
     image: circa10a/dead-mans-switch
+    command: server --storage-dir=/data
     ports:
-      - 80:80
-      - 443:443
+      - 8080:8080
+    volumes:
+      - dms_data:/data
+
+volumes:
+  dms_data:

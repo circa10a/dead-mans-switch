@@ -20,7 +20,7 @@ var (
 
 	rootCmd = &cobra.Command{
 		Use:     project,
-		Short:   "Manage Dead Man's switches",
+		Short:   "Manage Dead Man's Switches",
 		Version: version,
 	}
 )

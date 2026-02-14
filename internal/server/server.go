@@ -300,6 +300,7 @@ func (s *Server) Start() error {
 
 	// Auto TLS will create listeners on port 80 and 443
 	if s.AutoTLS {
+		s.printBanner(":80, :443")
 		log.Info("Starting server on :80 and :443")
 		certmagic.DefaultACME.Agreed = true
 		certmagic.DefaultACME.Email = s.ContactEmail
@@ -318,6 +319,7 @@ func (s *Server) Start() error {
 		IdleTimeout:       5 * time.Second,
 	}
 
+	s.printBanner(addr)
 	log.Info("Starting server on " + addr)
 
 	// If custom cert and key provided, listen on specified server port via https

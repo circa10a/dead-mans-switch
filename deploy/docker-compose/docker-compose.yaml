@@ -5,7 +5,9 @@ services:
       build: ../../
       ports:
         - 8080:8080
-      command: server --log-format json --metrics
+      command: server --log-format json --metrics --storage-dir=/data
+      volumes:
+      - dms_data:/data
 
   loki:
     container_name: loki
@@ -60,3 +62,4 @@ services:
 volumes:
   grafana_data:
   prometheus_data:
+  dms_data:

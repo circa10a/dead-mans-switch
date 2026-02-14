@@ -113,6 +113,21 @@ clean:
 	@rm -rf bin/ coverage.out
 
 
+MON_COMPOSE := deploy/docker-compose/docker-compose.yaml
+
+.PHONY: monitoring monitoring-down
+
+# Deploy the monitoring stack (Prometheus, Grafana, Loki, Promtail)
+monitoring:
+	@echo "==> Starting monitoring stack..."
+	@docker compose -f $(MON_COMPOSE) up -d
+
+# Stop the monitoring stack
+monitoring-down:
+	@echo "==> Stopping monitoring stack..."
+	@docker compose -f $(MON_COMPOSE) down
+
+
 AUTH_COMPOSE := authentik/docker-compose.yaml
 AUTH_CREDS   := authentik/dms-credentials.env
 

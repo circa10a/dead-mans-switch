@@ -315,6 +315,34 @@
         </div>
     </main>
 
+    <div x-show="authErrorOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+        <div x-show="authErrorOpen" x-transition.opacity @click="authErrorOpen = false"
+            class="fixed inset-0 bg-gray-900/50 dark:bg-black/90 backdrop-blur-sm"></div>
+        <div x-show="authErrorOpen" x-transition:enter="transition ease-out duration-300 transform"
+            x-transition:enter-start="translate-y-full sm:scale-95"
+            class="relative w-full max-w-lg bg-white dark:bg-[#121212] rounded-t-3xl sm:rounded-3xl border border-gray-200 dark:border-white/10 p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 bg-red-500/10 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-gray-900 dark:text-white">Connection Error</h3>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-medium tracking-wider">Authentication Provider</p>
+                </div>
+                <button type="button" @click="authErrorOpen = false"
+                    class="ml-auto text-gray-500 text-xs font-bold uppercase">Close</button>
+            </div>
+            <div class="bg-red-500/5 border border-red-500/10 rounded-2xl p-5 text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                <p x-text="authErrorMessage"></p>
+            </div>
+            <button @click="authErrorOpen = false; login()"
+                class="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3.5 rounded-2xl transition-all active:scale-95 text-xs uppercase tracking-widest">Retry</button>
+        </div>
+    </div>
+
     <div x-show="failureModalOpen" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
         <div x-show="failureModalOpen" x-transition.opacity @click="failureModalOpen = false"
             class="fixed inset-0 bg-gray-900/50 dark:bg-black/90 backdrop-blur-sm"></div>
@@ -472,6 +500,8 @@
                 accessToken: null,
                 userName: '',
                 oidcConfig: null,
+                authErrorOpen: false,
+                authErrorMessage: '',
 
                 // Drag and Drop state
                 draggingIndex: null,
@@ -866,8 +896,23 @@
                 },
 
                 // Auth methods
+                showAuthError(msg) {
+                    this.authErrorMessage = msg;
+                    this.authErrorOpen = true;
+                },
+
                 async login() {
-                    if (!this.oidcConfig) return;
+                    if (!this.oidcConfig) {
+                        this.showAuthError('Unable to reach the authentication provider. Please verify the server is running and try again.');
+                        return;
+                    }
+                    // Reachability check before redirecting
+                    try {
+                        const check = await fetch(this.oidcConfig.authorization_endpoint, { method: 'HEAD', mode: 'no-cors' });
+                    } catch (e) {
+                        this.showAuthError('The authentication provider is currently unreachable. Please check your connection and try again.');
+                        return;
+                    }
                     const verifier = generateCodeVerifier();
                     const challenge = await generateCodeChallenge(verifier);
                     // Generate cryptographic state for CSRF protection

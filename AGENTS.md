@@ -1,11 +1,66 @@
 # Agent Guidelines for Dead Man's Switch
 
-This doc provides guidelines for AI agents working on this codebase to maintain :sparkles: consistency :sparkles: and quality standards.
+This doc provides guidelines for AI agents working on this codebase to maintain consistency and quality standards. I hate that I have to add this, but it's 2026 :sigh:
 
-## Generated code
+## Project structure
 
-`api/gen.go` should never be modified by hand. `go generate ./...` will render changes in that file based on changes to `api/openapi.yaml`.
+```
+cmd/                        Cobra CLI commands (root, server, switch)
+internal/server/            Core server initialization, worker loop, banner
+  database/                 SQLite store implementing the Store interface
+  handlers/                 HTTP handlers — one struct per resource (Switch, Auth, Health)
+  middleware/               JWT auth, logging, Prometheus, request validation
+  secrets/                  Encryption key and VAPID key management
+  web/                      Embedded SPA (Alpine.js + Tailwind CSS)
+  docs/                     Generated API documentation HTML
+api/                        OpenAPI spec, codegen config, generated Go SDK
+deploy/                     Docker Compose, monitoring stack, K8s manifests
+```
 
+### Libraries
+
+Do not introduce alternatives to these without discussion:
+
+| Library | Purpose |
+|---|---|
+| `go-chi/chi` | HTTP router |
+| `spf13/cobra` + `spf13/viper` | CLI + config (env vars use `DEAD_MANS_SWITCH_` prefix) |
+| `charmbracelet/log` | slog handler (text/JSON output) |
+| `stretchr/testify` | Test assertions (`assert`, `require`) |
+| `modernc.org/sqlite` | Pure-Go SQLite (no CGO) |
+| `nicholas-fedor/shoutrrr` | Multi-provider notifications |
+| `go-playground/validator` | Request body validation |
+
+## Generated Code
+
+The following files are **all generated** — never modify them by hand:
+
+| File(s) | Regenerate with |
+|---|---|
+| `api/gen.go` | `go generate ./...` (from `api/openapi.yaml`) |
+| `api/openapi.internal.gen.yaml`, `api/openapi.external.gen.yaml` | `make docs` |
+| `internal/server/docs/api.internal.html`, `internal/server/docs/api.public.html` | `make docs` |
+
+## Build Pipeline
+
+`make build` runs these steps in order:
+
+1. **Codegen** — `go generate ./...` (regenerates `api/gen.go`)
+2. **Assets** — Tailwind CSS compilation + Alpine.js download (requires Docker)
+3. **Docs** — Redocly API doc rendering (requires Docker)
+4. **Compile** — `go build` with `-ldflags` injecting `cmd.version`, `cmd.commit`, `cmd.date`
+
+### Key Make Targets
+
+| Target | Purpose |
+|---|---|
+| `make build` | Full build pipeline → `bin/dead-mans-switch` |
+| `make test` | Run tests with coverage (excludes `api/gen.go` from report) |
+| `make lint` | `golangci-lint` via Docker |
+| `make sdk` | Regenerate only `api/gen.go` |
+| `make run` | Build + start the server |
+| `make monitoring` / `monitoring-down` | Start/stop Prometheus + Grafana + Loki stack |
+| `make auth` / `auth-down` | Start/stop local Authentik OIDC provider |
 
 ## Security
 
@@ -15,7 +70,17 @@ When changes are made, `gosec ./...` should pass without error. Should errors be
 
 All code introduced should pass `golangci-lint run -v` without error. Should errors be encountered, fix them properly. Do not insert comments to ignore the issues.
 
-## Go-Specific Syntax Rules
+## Code Review Checklist
+
+When creating new features, ensure:
+- [ ] Error handling follows the next-line rule with `%w` wrapping
+- [ ] Unit tests exist for all code paths (happy path, error cases, edge cases)
+- [ ] `testify/assert` and `testify/require` used for assertions
+- [ ] Config struct fields and flag definitions are alphabetically sorted
+- [ ] Code compiles and all existing tests still pass
+- [ ] No manual edits to generated files
+
+## Go-Specific Rules
 
 ### Configuration and Code Organization
 
@@ -31,15 +96,6 @@ type Config struct {
 	StorageDir        string
 	Validation        bool
 }
-
-serverFlags := []flagDef{
-	{Name: autoTLSKey, ...},
-	{Name: contactEmailKey, ...},
-	{Name: demoModeKey, ...},
-	{Name: portKey, ...},
-	{Name: storageDirKey, ...},
-	{Name: validationKey, ...},
-}
 ```
 
 **Bad**:
@@ -47,14 +103,9 @@ serverFlags := []flagDef{
 type Config struct {
 	ContactEmail      string
 	AutoTLS           bool
-	Validation        bool
 	Port              int
-	DemoMode          bool
-	StorageDir        string
 }
 ```
-
-This ensures consistency across the codebase and makes it easier to find configuration options.
 
 ### Error Handling
 
@@ -75,42 +126,66 @@ result, err := someFunction(); if err != nil {
 }
 ```
 
-**Exception**: Only use `err == nil` checks when absolutely necessary (e.g., when explicitly verifying success), and these should be rare.
-
-**Preferred**: Use the positive error check (`if err != nil`) pattern consistently throughout the codebase.
+**Error wrapping**: Always use `%w` when wrapping an existing `error` value. Only use `%v` or `%s` when constructing a new error from non-error data.
 
 ```go
-// Good - positive error check
-err := db.Init()
-if err != nil {
-    return fmt.Errorf("failed to initialize: %w", err)
-}
+// Wrapping an error — use %w
+return fmt.Errorf("failed to initialize: %w", err)
 
-// Avoid - negative error check (unless absolutely required)
-if err == nil {
-    // do something
-}
+// Constructing from non-error values — %v or %s is fine
+return fmt.Errorf("unexpected signing method: %v", alg)
 ```
+
+Prefer `if err != nil` (positive check) consistently. Avoid `if err == nil` unless absolutely necessary.
+
+### Logging
+
+Use `*slog.Logger` stored on structs. Create child loggers with a `"component"` label for context:
+
+```go
+log := s.logger.With("component", "server")
+log.Info("Starting server", "addr", addr)
+```
+
+In tests, silence the logger:
+```go
+logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+```
+
+### Middleware
+
+All middleware follows the `func(http.Handler) http.Handler` signature. Use chi route groups to scope middleware:
+
+- **Global**: Logging, Prometheus metrics
+- **Route-group**: JWT auth (all `/api/v1` routes except `/auth/config`), validation (POST/PUT only)
+
+For request-scoped values, use a private `contextKey` type:
+```go
+type contextKey string
+const UserIDKey contextKey = "userID"
+```
+
+### Embedded Assets
+
+Web assets and API docs are compiled into the binary via `//go:embed`. After changing files in `web/` or `docs/`, rebuild the binary to pick up the changes.
 
 ## Testing Requirements
 
-### Unit Test Coverage
+### Organization
 
-**Rule**: Every new piece of functionality must have comprehensive unit tests that cover all cases and error scenarios.
+- Place tests in `*_test.go` files alongside the code
+- Use table-driven tests with `t.Run()` subtests
+- Use `testify/assert` and `testify/require` for assertions
+- Use `t.Helper()` in setup functions (e.g., `setupTestHandler(t)`)
 
-**Requirements**:
-1. **Happy Path**: Test the normal, expected behavior
-2. **Error Cases**: Test all error conditions and edge cases
-3. **Boundary Conditions**: Test limits and special values
-4. **Return Values**: Verify all return values are correct
+### Test Infrastructure
 
-**Test Organization**:
-- Place tests in `*_test.go` files alongside the functionality
-- Use table-driven tests for multiple scenarios
-- Name test cases descriptively with `TestFunctionName` convention
-- Use subtests with `t.Run()` for organizing related tests
+- **Handler tests**: Use `httptest.NewRequest` + `httptest.NewRecorder` with a real SQLite database in `t.TempDir()`
+- **Worker tests**: Use mock `Store` implementations for isolated unit testing
+- **Logger**: Always silence with `slog.New(slog.NewTextHandler(io.Discard, nil))`
 
-**Example**:
+### Example
+
 ```go
 func TestNewFeature(t *testing.T) {
 	tests := []struct {
@@ -120,49 +195,39 @@ func TestNewFeature(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:     "valid input",
-			input:    "test",
-			expected: "result",
+			name:      "valid input",
+			input:     "test",
+			expected:  "result",
 			expectErr: false,
 		},
 		{
-			name:      "invalid input",
+			name:      "empty input returns error",
 			input:     "",
 			expected:  "",
 			expectErr: true,
-		},
-		{
-			name:      "edge case",
-			input:     "edge",
-			expected:  "edge_result",
-			expectErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := NewFeature(tt.input)
-			if (err != nil) != tt.expectErr {
-				t.Errorf("unexpected error: got %v, wantErr %v", err, tt.expectErr)
+			if tt.expectErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
-			if result != tt.expected {
-				t.Errorf("unexpected result: got %v, want %v", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
+
 ```
+## Docker Conventions
 
-**Coverage Expectations**:
-- Aim for 80%+ code coverage on new functionality
-- 100% coverage on error paths
-- All branches should be tested
+Image is built from `scratch`:
 
-## Code Review Checklist
-
-When creating new features, ensure:
-- [ ] Error handling follows the next-line rule
-- [ ] Unit tests exist for all code paths
-- [ ] Tests cover happy path, error cases, and edge cases
-- [ ] Code compiles without errors or warnings
-- [ ] Existing tests still pass
+- `CGO_ENABLED=0` — required (SQLite driver is pure Go)
+- Runs as non-root user (UID 1000)
+- `/data` volume — database + VAPID keys (persistent, back it up)
+- `/cache` volume — CertMagic TLS certificate state
+- Exposes ports: 8080 (HTTP), 80/443 (AutoTLS)
