@@ -39,6 +39,8 @@ type Switch struct {
 func (s *Switch) PostHandleFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	userID := middleware.GetUserIDFromContext(r)
+
 	// Use the new wrapper struct from context
 	val, ok := middleware.FromContext(r.Context())
 	if !ok {
@@ -50,6 +52,9 @@ func (s *Switch) PostHandleFunc(w http.ResponseWriter, r *http.Request) {
 	// Set as active
 	statusActive := api.SwitchStatusActive
 	payload.Status = &statusActive
+
+	// Set user ownership
+	payload.UserId = &userID
 
 	// Compute time at which to send using pre-parsed duration
 	triggerAt := time.Now().Add(val.CheckInIntervalDuration).Unix()
@@ -73,6 +78,8 @@ func (s *Switch) PostHandleFunc(w http.ResponseWriter, r *http.Request) {
 func (s *Switch) GetHandleFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	userID := middleware.GetUserIDFromContext(r)
+
 	limit := defaultLimit
 
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -84,7 +91,7 @@ func (s *Switch) GetHandleFunc(w http.ResponseWriter, r *http.Request) {
 		limit = val
 	}
 
-	foundSwitches, err := s.Store.GetAll(limit)
+	foundSwitches, err := s.Store.GetAll(userID, limit)
 	if err != nil {
 		s.sendError(w, http.StatusInternalServerError, errDatabaseError, err)
 		return
@@ -102,6 +109,8 @@ func (s *Switch) GetHandleFunc(w http.ResponseWriter, r *http.Request) {
 func (s *Switch) GetByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	userID := middleware.GetUserIDFromContext(r)
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -109,7 +118,7 @@ func (s *Switch) GetByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	foundSwitch, err := s.Store.GetByID(id)
+	foundSwitch, err := s.Store.GetByID(userID, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
@@ -127,6 +136,8 @@ func (s *Switch) GetByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	userID := middleware.GetUserIDFromContext(r)
+
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -141,7 +152,10 @@ func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 	}
 	payload := val.Payload
 
-	previousSwitch, err := s.Store.GetByID(id)
+	// Set user ownership
+	payload.UserId = &userID
+
+	previousSwitch, err := s.Store.GetByID(userID, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
@@ -178,13 +192,15 @@ func (s *Switch) PutByIDHandleFunc(w http.ResponseWriter, r *http.Request) {
 func (s *Switch) DeleteHandleFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	userID := middleware.GetUserIDFromContext(r)
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		s.sendError(w, http.StatusBadRequest, errInvalidSwitchID, err)
 		return
 	}
 
-	_, err = s.Store.GetByID(id)
+	_, err = s.Store.GetByID(userID, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
@@ -194,7 +210,7 @@ func (s *Switch) DeleteHandleFunc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = s.Store.Delete(id)
+	err = s.Store.Delete(userID, id)
 	if err != nil {
 		s.sendError(w, http.StatusInternalServerError, errFailedToDelete, err)
 		return
@@ -207,13 +223,15 @@ func (s *Switch) DeleteHandleFunc(w http.ResponseWriter, r *http.Request) {
 func (s *Switch) ResetHandleFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	userID := middleware.GetUserIDFromContext(r)
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		s.sendError(w, http.StatusBadRequest, errInvalidSwitchID, err)
 		return
 	}
 
-	switchToReset, err := s.Store.GetByID(id)
+	switchToReset, err := s.Store.GetByID(userID, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)
@@ -259,13 +277,15 @@ func (s *Switch) ResetHandleFunc(w http.ResponseWriter, r *http.Request) {
 
 // DisableHandleFunc marks a switch as disabled.
 func (s *Switch) DisableHandleFunc(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserIDFromContext(r)
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		s.sendError(w, http.StatusBadRequest, "invalid switch ID", err)
 		return
 	}
 
-	switchToDisable, err := s.Store.GetByID(id)
+	switchToDisable, err := s.Store.GetByID(userID, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			s.sendError(w, http.StatusNotFound, errSwitchNotFound, err)

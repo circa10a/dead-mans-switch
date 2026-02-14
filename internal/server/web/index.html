@@ -83,9 +83,15 @@
 <body class="text-gray-900 dark:text-gray-300 antialiased" x-data="app()">
     <template x-if="!isSecure && showInsecureWarning">
         <div
-            class="bg-amber-500 text-black px-4 py-2 text-[10px] font-bold uppercase tracking-widest flex justify-between items-center z-[60] relative">
-            <span>Push Notifications require HTTPS / Secure Context</span>
-            <button @click="showInsecureWarning = false" class="bg-black/10 px-2 py-1 rounded">Dismiss</button>
+            class="bg-indigo-600 text-white px-5 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] flex justify-between items-center z-[60] relative shadow-lg shadow-indigo-900/30">
+            <div class="flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <span>Notifications require HTTPS</span>
+            </div>
+            <button @click="showInsecureWarning = false" class="bg-white/15 hover:bg-white/25 px-2.5 py-1 rounded-md transition-colors text-white/90">Dismiss</button>
         </div>
     </template>
 
@@ -126,7 +132,21 @@
                     </svg>
                 </button>
 
-                <button @click="forcePermission()" class="p-2 rounded-full transition-all active:scale-95" :class="{
+                <template x-if="authEnabled && accessToken">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline truncate max-w-[120px]" x-text="userName"></span>
+                        <button @click="logout()"
+                            class="p-2 rounded-full transition-all text-gray-500 hover:bg-red-500/10 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 active:scale-95"
+                            title="Logout">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                            </svg>
+                        </button>
+                    </div>
+                </template>
+
+                <button @click="forcePermission()" x-show="!authEnabled || accessToken" class="p-2 rounded-full transition-all active:scale-95" :class="{
                         'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 animate-pulse': notifyStatus === 'default',
                         'text-indigo-500 dark:text-indigo-400 bg-indigo-500/10': notifyStatus === 'granted',
                         'text-gray-500 dark:text-gray-700 bg-black/5 dark:bg-white/5': notifyStatus === 'denied'
@@ -138,7 +158,7 @@
                     </svg>
                 </button>
 
-                <button @click="openCreateModal()"
+                <button @click="openCreateModal()" x-show="!authEnabled || accessToken"
                     class="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-600 dark:hover:bg-indigo-500 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-md">+
                     New</button>
             </div>
@@ -146,7 +166,28 @@
     </header>
 
     <main class="max-w-3xl mx-auto px-4 py-6 pb-32 min-h-screen">
-        <div class="space-y-4">
+        <!-- Login screen when auth is enabled but user not authenticated -->
+        <template x-if="authEnabled && !accessToken && authReady">
+            <div class="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                <div class="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center shadow-2xl shadow-indigo-900/40">
+                    <img src="/images/purple-skull-512-rounded.png" alt="App Icon" class="w-12 h-12 object-contain">
+                </div>
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Sign in required</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Authenticate to manage your dead man's switches</p>
+                </div>
+                <button @click="login()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-600 dark:hover:bg-indigo-500 px-8 py-3 rounded-full text-sm font-bold transition-all shadow-lg shadow-indigo-900/30 active:scale-95 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Sign in with Authentik
+                </button>
+            </div>
+        </template>
+
+        <div class="space-y-4" x-show="!authEnabled || accessToken">
             <template x-for="(sw, index) in switches" :key="sw.id">
                 <div draggable="true" @dragstart="dragStart($event, index)" @dragover.prevent
                     @drop="drop($event, index)" @dragend="dragEnd()"
@@ -394,6 +435,24 @@
     </div>
 
     <script>
+        // PKCE helpers (must be defined before Alpine)
+        function generateCodeVerifier() {
+            const arr = new Uint8Array(32);
+            crypto.getRandomValues(arr);
+            return btoa(String.fromCharCode(...arr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+        async function generateCodeChallenge(verifier) {
+            const data = new TextEncoder().encode(verifier);
+            const digest = await crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+        function parseJwt(token) {
+            try {
+                const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                return JSON.parse(atob(base64));
+            } catch { return null; }
+        }
+
         function app() {
             return {
                 sw: null,
@@ -406,6 +465,13 @@
                 notifyStatus: ('Notification' in window) ? Notification.permission : 'unsupported',
                 vapidPublicKey: '',
                 darkMode: document.documentElement.classList.contains('dark'),
+
+                // Auth state
+                authEnabled: false,
+                authReady: false,
+                accessToken: null,
+                userName: '',
+                oidcConfig: null,
 
                 // Drag and Drop state
                 draggingIndex: null,
@@ -450,6 +516,59 @@
                 },
 
                 async init() {
+                    // Check auth configuration
+                    try {
+                        const authRes = await fetch(`${this.baseUrl}/auth/config`);
+                        if (authRes.ok) {
+                            const authConfig = await authRes.json();
+                            this.authEnabled = authConfig.enabled;
+                            if (this.authEnabled) {
+                                // Fetch OIDC discovery
+                                const discRes = await fetch(authConfig.issuerUrl + '.well-known/openid-configuration');
+                                if (discRes.ok) {
+                                    this.oidcConfig = await discRes.json();
+                                    this.oidcConfig.clientId = authConfig.audience;
+                                }
+                                // Check for auth callback (code in URL)
+                                const params = new URLSearchParams(window.location.search);
+                                const code = params.get('code');
+                                const returnedState = params.get('state');
+                                if (code) {
+                                    // Validate state parameter to prevent CSRF
+                                    const savedState = sessionStorage.getItem('dms_oauth_state');
+                                    if (!savedState || savedState !== returnedState) {
+                                        console.error('OAuth state mismatch — possible CSRF');
+                                        sessionStorage.removeItem('dms_oauth_state');
+                                        sessionStorage.removeItem('dms_pkce_verifier');
+                                    } else {
+                                        sessionStorage.removeItem('dms_oauth_state');
+                                        await this.exchangeCode(code);
+                                    }
+                                    window.history.replaceState({}, '', '/');
+                                } else {
+                                    // Try to restore token from sessionStorage
+                                    const saved = sessionStorage.getItem('dms_access_token');
+                                    if (saved) {
+                                        const claims = parseJwt(saved);
+                                        if (claims && claims.exp * 1000 > Date.now()) {
+                                            this.accessToken = saved;
+                                            this.userName = claims.preferred_username || claims.name || claims.email || claims.sub || '';
+                                        } else {
+                                            sessionStorage.removeItem('dms_access_token');
+                                            sessionStorage.removeItem('dms_id_token');
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Auth config fetch failed", e);
+                    }
+                    this.authReady = true;
+
+                    // If auth required but not logged in, stop here
+                    if (this.authEnabled && !this.accessToken) return;
+
                     // Setup Connection Listeners
                     window.addEventListener('online', async () => {
                         // Add small delay to ensure server is ready
@@ -460,7 +579,7 @@
 
                     // Fetch VAPID Key from server
                     try {
-                        const res = await fetch(`${this.baseUrl}/vapid`);
+                        const res = await fetch(`${this.baseUrl}/vapid`, { headers: this.authHeaders() });
                         if (res.ok) {
                             this.vapidPublicKey = (await res.text()).trim();
                             this.isOnline = true;
@@ -588,14 +707,14 @@
 
                 async deleteSw(id) {
                     if (confirm('Delete?')) {
-                        await fetch(`${this.baseUrl}/switch/${id}`, { method: 'DELETE' });
+                        await fetch(`${this.baseUrl}/switch/${id}`, { method: 'DELETE', headers: this.authHeaders() });
                         await this.getSw();
                     }
                 },
 
                 async disableSw(id) {
                     try {
-                        await fetch(`${this.baseUrl}/switch/${id}/disable`, { method: 'POST' });
+                        await fetch(`${this.baseUrl}/switch/${id}/disable`, { method: 'POST', headers: this.authHeaders() });
                         await this.getSw();
                     } catch (e) { console.error("Disable failed", e); }
                 },
@@ -605,7 +724,11 @@
                     if (this.draggingIndex !== null) return;
 
                     try {
-                        const r = await fetch(`${this.baseUrl}/switch`);
+                        const r = await fetch(`${this.baseUrl}/switch`, { headers: this.authHeaders() });
+                        if (r.status === 401 && this.authEnabled) {
+                            await this.refreshToken();
+                            return;
+                        }
                         if (!r.ok) throw new Error("Server error");
                         const data = await r.json();
 
@@ -628,7 +751,7 @@
                     try {
                         const response = await fetch(`${this.baseUrl}/switch/${id}/reset`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
                             body: JSON.stringify({ pushSubscription: currentSub })
                         });
 
@@ -663,7 +786,7 @@
                         const res = await fetch(url, {
                             method: this.editingId ? 'PUT' : 'POST',
                             body: JSON.stringify(payload),
-                            headers: { 'Content-Type': 'application/json' }
+                            headers: { 'Content-Type': 'application/json', ...this.authHeaders() }
                         });
 
                         if (res.ok) {
@@ -740,11 +863,141 @@
                         }
                     }
                     return null;
+                },
+
+                // Auth methods
+                async login() {
+                    if (!this.oidcConfig) return;
+                    const verifier = generateCodeVerifier();
+                    const challenge = await generateCodeChallenge(verifier);
+                    // Generate cryptographic state for CSRF protection
+                    const stateArr = new Uint8Array(16);
+                    crypto.getRandomValues(stateArr);
+                    const state = btoa(String.fromCharCode(...stateArr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+                    sessionStorage.setItem('dms_pkce_verifier', verifier);
+                    sessionStorage.setItem('dms_oauth_state', state);
+                    const params = new URLSearchParams({
+                        response_type: 'code',
+                        client_id: this.oidcConfig.clientId,
+                        redirect_uri: window.location.origin + '/',
+                        scope: 'openid email profile offline_access',
+                        code_challenge: challenge,
+                        code_challenge_method: 'S256',
+                        state: state,
+                    });
+                    window.location.href = this.oidcConfig.authorization_endpoint + '?' + params.toString();
+                },
+
+                async exchangeCode(code) {
+                    const verifier = sessionStorage.getItem('dms_pkce_verifier');
+                    if (!verifier || !this.oidcConfig) return;
+                    sessionStorage.removeItem('dms_pkce_verifier');
+                    try {
+                        const res = await fetch(this.oidcConfig.token_endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                grant_type: 'authorization_code',
+                                code: code,
+                                redirect_uri: window.location.origin + '/',
+                                client_id: this.oidcConfig.clientId,
+                                code_verifier: verifier,
+                            }),
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.setTokens(data);
+                        } else {
+                            console.error("Token exchange failed", await res.text());
+                        }
+                    } catch (e) {
+                        console.error("Token exchange error", e);
+                    }
+                },
+
+                setTokens(data) {
+                    this.accessToken = data.access_token;
+                    sessionStorage.setItem('dms_access_token', data.access_token);
+                    if (data.id_token) sessionStorage.setItem('dms_id_token', data.id_token);
+                    if (data.refresh_token) sessionStorage.setItem('dms_refresh_token', data.refresh_token);
+                    const claims = parseJwt(data.access_token);
+                    this.userName = claims?.preferred_username || claims?.name || claims?.email || claims?.sub || '';
+                    // Schedule token refresh before expiry
+                    if (claims?.exp) {
+                        const msUntilExpiry = (claims.exp * 1000) - Date.now() - 30000; // 30s before
+                        if (msUntilExpiry > 0) {
+                            clearTimeout(this._refreshTimer);
+                            this._refreshTimer = setTimeout(() => this.refreshToken(), msUntilExpiry);
+                        }
+                    }
+                },
+
+                async refreshToken() {
+                    const rt = sessionStorage.getItem('dms_refresh_token');
+                    if (!rt || !this.oidcConfig) {
+                        this.handleSessionExpired();
+                        return;
+                    }
+                    try {
+                        const res = await fetch(this.oidcConfig.token_endpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                grant_type: 'refresh_token',
+                                refresh_token: rt,
+                                client_id: this.oidcConfig.clientId,
+                            }),
+                        });
+                        if (res.ok) {
+                            this.setTokens(await res.json());
+                        } else {
+                            this.handleSessionExpired();
+                        }
+                    } catch (e) {
+                        console.error('Token refresh failed', e);
+                        this.handleSessionExpired();
+                    }
+                },
+
+                handleSessionExpired() {
+                    sessionStorage.removeItem('dms_access_token');
+                    sessionStorage.removeItem('dms_id_token');
+                    sessionStorage.removeItem('dms_refresh_token');
+                    this.accessToken = null;
+                    this.userName = '';
+                    this.switches = [];
+                    // Re-trigger login automatically
+                    this.login();
+                },
+
+                logout() {
+                    clearTimeout(this._refreshTimer);
+                    const idToken = sessionStorage.getItem('dms_id_token');
+                    sessionStorage.removeItem('dms_access_token');
+                    sessionStorage.removeItem('dms_id_token');
+                    sessionStorage.removeItem('dms_refresh_token');
+                    this.accessToken = null;
+                    this.userName = '';
+                    this.switches = [];
+                    if (this.oidcConfig?.end_session_endpoint && idToken) {
+                        const params = new URLSearchParams({
+                            id_token_hint: idToken,
+                            post_logout_redirect_uri: window.location.origin + '/',
+                        });
+                        window.location.href = this.oidcConfig.end_session_endpoint + '?' + params.toString();
+                    }
+                },
+
+                authHeaders() {
+                    if (this.accessToken) {
+                        return { 'Authorization': 'Bearer ' + this.accessToken };
+                    }
+                    return {};
                 }
             }
         }
     </script>
-    <div x-show="notifyStatus === 'default'" x-transition:enter="transition ease-out duration-500"
+    <div x-show="notifyStatus === 'default' && (!authEnabled || accessToken)" x-transition:enter="transition ease-out duration-500"
         x-transition:enter-start="translate-y-20 opacity-0" x-transition:enter-end="translate-y-0 opacity-100"
         class="fixed bottom-6 left-4 right-4 z-[60] max-w-md mx-auto">
         <div

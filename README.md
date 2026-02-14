@@ -5,8 +5,17 @@
 
 <img width="45%" src="" align="right" style="margin-left: 20px"/>
 
-**Dead Man's Switch** is an all one self-hosted app for creating a "Dead Man's Switch". Create switch
-via the UI, API, or CLI that sends a message via many providers if you don't "check-in" by resetting your timer.
+**Dead Man's Switch** is an all one self-hosted app for creating a "Dead Man's Switch". Create switch via the UI, API, or CLI that sends a message via many providers if you don't "check-in" by resetting your timer(s).
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [CLI Reference](#cli-reference)
+- [Deployment](#deployment)
+- [Features](#features)
+- [Guides](#guides)
+- [Development](#development)
+- [License](#license)
 
 ## Quick Start
 
@@ -155,14 +164,9 @@ See [deploy/k8s](deploy/k8s) for the manifest files.
 - **Production ready** - Comprehensive CI/CD pipeline, security scanning, automated releases
 - **Developer friendly** - Easy local setup with Docker Compose, Kubernetes support via Tilt
 
-## Documentation
+## Guides
 
-For comprehensive guides and in-depth documentation, visit the [GitHub Wiki](https://github.com/circa10a/dead-man-switch-api/wiki):
-
-- [Authentik Integration Guide](https://github.com/circa10a/dead-man-switch-api/wiki/Authentik-Integration)
-- [Deployment Guides](https://github.com/circa10a/dead-man-switch-api/wiki/Deployment)
-- [Configuration Reference](https://github.com/circa10a/dead-man-switch-api/wiki/Configuration)
-- [API Examples](https://github.com/circa10a/dead-man-switch-api/wiki/API-Examples)
+- [Authentik Integration](guides/AUTHENTIK_INTEGRATION.md) — Set up OIDC authentication with Authentik
 
 ## Development
 
@@ -183,6 +187,16 @@ make run
 
 ```bash
 make test
+```
+
+### Run local authentik stack
+
+```console
+# Start
+make auth
+
+# Stop
+make auth-down
 ```
 
 ## License

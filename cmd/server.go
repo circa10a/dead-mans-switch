@@ -19,6 +19,9 @@ import (
 
 // Constants for Viper keys and Flag names
 const (
+	authEnabledKey        = "auth-enabled"
+	authIssuerURLKey      = "auth-issuer-url"
+	authAudienceKey       = "auth-audience"
 	autoTLSKey            = "auto-tls"
 	contactEmailKey       = "contact-email"
 	demoModeKey           = "demo-mode"
@@ -42,6 +45,9 @@ var serverCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Build server configuration using the constants
 		cfg := &server.Config{
+			AuthEnabled:       viper.GetBool(authEnabledKey),
+			AuthIssuerURL:     viper.GetString(authIssuerURLKey),
+			AuthAudience:      viper.GetString(authAudienceKey),
 			AutoTLS:           viper.GetBool(autoTLSKey),
 			ContactEmail:      viper.GetString(contactEmailKey),
 			DemoMode:          viper.GetBool(demoModeKey),
@@ -85,6 +91,9 @@ func init() {
 	rootCmd.AddCommand(serverCmd)
 
 	serverFlags := []flagDef{
+		{Name: authEnabledKey, Type: "bool", Default: false, Usage: "Enable JWT authentication via Authentik.", ViperKey: authEnabledKey},
+		{Name: authIssuerURLKey, Type: "string", Default: "", Usage: "Authentik OAuth2 issuer URL.", ViperKey: authIssuerURLKey},
+		{Name: authAudienceKey, Type: "string", Default: "", Usage: "Expected JWT audience claim.", ViperKey: authAudienceKey},
 		{Name: autoTLSKey, Shorthand: "a", Type: "bool", Default: false, Usage: "Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation.", ViperKey: autoTLSKey},
 		{Name: contactEmailKey, Shorthand: "", Type: "string", Default: "user@dead-mans-switch.com", Usage: "Email used for TLS cert registration + push notification point of contact (not required).", ViperKey: contactEmailKey},
 		{Name: demoModeKey, Shorthand: "", Type: "bool", Default: false, Usage: "Enable demo mode which creates sample switches on startup and resets the database periodically.", ViperKey: demoModeKey},

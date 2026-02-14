@@ -17,6 +17,10 @@ import (
 	"golang.org/x/text/language"
 )
 
+const (
+	adminUser = "admin"
+)
+
 // Worker periodically processes expired switches and sends notifications.
 type Worker struct {
 	Store           database.Store
@@ -123,7 +127,12 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 
 	if *sw.DeleteAfterTriggered {
 		w.Logger.Debug("Auto-deleting switch after triggering", "id", *sw.Id)
-		err := w.Store.Delete(*sw.Id)
+
+		userID := adminUser
+		if sw.UserId != nil {
+			userID = *sw.UserId
+		}
+		err := w.Store.Delete(userID, *sw.Id)
 		if err != nil {
 			return err
 		}

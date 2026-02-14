@@ -35,6 +35,8 @@ paths:
     get:
       summary: Get the VAPID public key for PWA push notifications
       description: Returns the raw public key string required for the browser pushManager handshake.
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: The VAPID public key
@@ -43,9 +45,17 @@ paths:
               schema:
                 type: string
                 example: "someSecretKey"
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /switch:
     get:
       summary: Get all switches
+      security:
+        - bearerAuth: []
       parameters:
         - name: limit
           in: query
@@ -64,6 +74,12 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Switch'
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -72,6 +88,8 @@ paths:
                 $ref: '#/components/schemas/Error'
     post:
       summary: Create dead man switch
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -91,6 +109,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: Internal server error
           content:
@@ -100,6 +124,8 @@ paths:
   /switch/{id}:
     get:
       summary: Get a specific dead man switch
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -113,6 +139,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Switch'
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Switch not found
           content:
@@ -127,6 +159,8 @@ paths:
                 $ref: '#/components/schemas/Error'
     put:
       summary: Update an existing dead man switch
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -152,6 +186,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Switch not found
           content:
@@ -166,6 +206,8 @@ paths:
                 $ref: '#/components/schemas/Error'
     delete:
       summary: Delete a dead man switch
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -175,6 +217,12 @@ paths:
       responses:
         '204':
           description: Switch successfully deleted
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Switch not found
           content:
@@ -190,6 +238,8 @@ paths:
   /switch/{id}/reset:
     post:
       summary: Reset the dead man switch timer
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -203,6 +253,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Switch'
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Switch not found
           content:
@@ -218,6 +274,8 @@ paths:
   /switch/{id}/disable:
     post:
       summary: Disable the dead man switch
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -231,6 +289,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Switch'
+        '401':
+          description: Unauthorized – missing or invalid JWT token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Switch not found
           content:
@@ -245,6 +309,12 @@ paths:
                 $ref: '#/components/schemas/Error'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from Authentik OAuth2 provider
   schemas:
     Error:
       type: object
@@ -347,6 +417,11 @@ components:
           format: int64
           example: 1737812700
           readOnly: true
+        userId:
+          type: string
+          description: "User ID of the switch owner"
+          readOnly: true
+          example: "user@example.com"
     PushSubscription:
       type: object
       description: "Details to send push notifications. Secret fields that aren't available to be read via the API"

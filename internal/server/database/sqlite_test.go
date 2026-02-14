@@ -2,6 +2,7 @@ package database
 
 import (
 	"bytes"
+	"database/sql"
 	"testing"
 	"time"
 
@@ -45,7 +46,7 @@ func TestSQLiteStore_CRUD(t *testing.T) {
 			t.Errorf("expected message %s, got %s", sw.Message, created.Message)
 		}
 
-		found, err := store.GetByID(*created.Id)
+		found, err := store.GetByID("admin", *created.Id)
 		if err != nil {
 			t.Fatalf("failed to get switch: %v", err)
 		}
@@ -303,6 +304,170 @@ func TestEncryptionPrimitives(t *testing.T) {
 
 		if !bytes.Equal(plaintext, decrypted) {
 			t.Errorf("expected %s, got %s", string(plaintext), string(decrypted))
+		}
+	})
+}
+
+func TestSQLiteStore_UserScoping(t *testing.T) {
+	store := setupTestStore(t)
+	oneHourLater := time.Now().Add(time.Hour).Unix()
+
+	user1 := "user1@example.com"
+	user2 := "user2@example.com"
+
+	sw1 := api.Switch{
+		Message:         "User1 Switch",
+		Notifiers:       []string{"logger://"},
+		CheckInInterval: "1h",
+		TriggerAt:       &oneHourLater,
+		Status:          &statusActive,
+		UserId:          &user1,
+	}
+
+	sw2 := api.Switch{
+		Message:         "User2 Switch",
+		Notifiers:       []string{"logger://"},
+		CheckInInterval: "1h",
+		TriggerAt:       &oneHourLater,
+		Status:          &statusActive,
+		UserId:          &user2,
+	}
+
+	t.Run("Create assigns userId", func(t *testing.T) {
+		created, err := store.Create(sw1)
+		if err != nil {
+			t.Fatalf("failed to create switch: %v", err)
+		}
+		if created.UserId == nil || *created.UserId != user1 {
+			t.Errorf("expected userId %s, got %v", user1, created.UserId)
+		}
+	})
+
+	t.Run("Create defaults to admin when userId is nil", func(t *testing.T) {
+		noUserSw := api.Switch{
+			Message:         "No User Switch",
+			Notifiers:       []string{"logger://"},
+			CheckInInterval: "1h",
+			TriggerAt:       &oneHourLater,
+			Status:          &statusActive,
+		}
+		created, err := store.Create(noUserSw)
+		if err != nil {
+			t.Fatalf("failed to create switch: %v", err)
+		}
+		if created.UserId == nil || *created.UserId != "admin" {
+			t.Errorf("expected userId 'admin', got %v", created.UserId)
+		}
+	})
+
+	t.Run("GetAll only returns switches for the specified user", func(t *testing.T) {
+		_, err := store.Create(sw2)
+		if err != nil {
+			t.Fatalf("failed to create switch: %v", err)
+		}
+
+		user1Switches, err := store.GetAll(user1, -1)
+		if err != nil {
+			t.Fatalf("failed to get switches: %v", err)
+		}
+		for _, s := range user1Switches {
+			if s.UserId == nil || *s.UserId != user1 {
+				t.Errorf("expected all switches to belong to %s, got %v", user1, s.UserId)
+			}
+		}
+
+		user2Switches, err := store.GetAll(user2, -1)
+		if err != nil {
+			t.Fatalf("failed to get switches: %v", err)
+		}
+		for _, s := range user2Switches {
+			if s.UserId == nil || *s.UserId != user2 {
+				t.Errorf("expected all switches to belong to %s, got %v", user2, s.UserId)
+			}
+		}
+
+		if len(user1Switches) == 0 {
+			t.Error("expected user1 to have switches")
+		}
+		if len(user2Switches) == 0 {
+			t.Error("expected user2 to have switches")
+		}
+	})
+
+	t.Run("GetByID returns not found for wrong user", func(t *testing.T) {
+		created, err := store.Create(sw1)
+		if err != nil {
+			t.Fatalf("failed to create switch: %v", err)
+		}
+
+		// user2 should not see user1's switch
+		_, err = store.GetByID(user2, *created.Id)
+		if err != sql.ErrNoRows {
+			t.Errorf("expected ErrNoRows for wrong user, got %v", err)
+		}
+
+		// user1 should see their own switch
+		found, err := store.GetByID(user1, *created.Id)
+		if err != nil {
+			t.Fatalf("expected to find switch for correct user: %v", err)
+		}
+		if *found.Id != *created.Id {
+			t.Errorf("expected id %d, got %d", *created.Id, *found.Id)
+		}
+	})
+
+	t.Run("Update fails for wrong user", func(t *testing.T) {
+		created, err := store.Create(sw1)
+		if err != nil {
+			t.Fatalf("failed to create switch: %v", err)
+		}
+
+		updateData := created
+		updateData.Message = "Hacked"
+		updateData.UserId = &user2
+
+		_, err = store.Update(*created.Id, updateData)
+		if err != sql.ErrNoRows {
+			t.Errorf("expected ErrNoRows when updating as wrong user, got %v", err)
+		}
+	})
+
+	t.Run("Delete fails for wrong user", func(t *testing.T) {
+		created, err := store.Create(sw1)
+		if err != nil {
+			t.Fatalf("failed to create switch: %v", err)
+		}
+
+		// user2 tries to delete user1's switch - should not delete
+		err = store.Delete(user2, *created.Id)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		// switch should still exist for user1
+		found, err := store.GetByID(user1, *created.Id)
+		if err != nil {
+			t.Fatalf("switch should still exist after wrong-user delete: %v", err)
+		}
+		if *found.Id != *created.Id {
+			t.Error("switch was unexpectedly deleted by wrong user")
+		}
+	})
+
+	t.Run("Delete succeeds for correct user", func(t *testing.T) {
+		created, err := store.Create(sw1)
+		if err != nil {
+			t.Fatalf("failed to create switch: %v", err)
+		}
+
+		err = store.Delete(user1, *created.Id)
+		if err != nil {
+			t.Fatalf("failed to delete: %v", err)
+		}
+
+		_, err = store.GetByID(user1, *created.Id)
+		if err != sql.ErrNoRows {
+			t.Errorf("expected ErrNoRows after delete, got %v", err)
 		}
 	})
 }

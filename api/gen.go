@@ -16,6 +16,10 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+const (
+	BearerAuthScopes = "bearerAuth.Scopes"
+)
+
 // Defines values for HealthStatus.
 const (
 	HealthStatusFailed HealthStatus = "failed"
@@ -91,6 +95,9 @@ type Switch struct {
 
 	// TriggerAt Time to trigger in Unix time format to trigger switch
 	TriggerAt *int64 `json:"triggerAt,omitempty"`
+
+	// UserId User ID of the switch owner
+	UserId *string `json:"userId,omitempty"`
 }
 
 // SwitchStatus Current switch status
@@ -773,6 +780,7 @@ type GetSwitchResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]Switch
+	JSON401      *Error
 	JSON500      *Error
 }
 
@@ -797,6 +805,7 @@ type PostSwitchResponse struct {
 	HTTPResponse *http.Response
 	JSON201      *Switch
 	JSON400      *Error
+	JSON401      *Error
 	JSON500      *Error
 }
 
@@ -819,6 +828,7 @@ func (r PostSwitchResponse) StatusCode() int {
 type DeleteSwitchIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON401      *Error
 	JSON404      *Error
 	JSON500      *Error
 }
@@ -843,6 +853,7 @@ type GetSwitchIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Switch
+	JSON401      *Error
 	JSON404      *Error
 	JSON500      *Error
 }
@@ -868,6 +879,7 @@ type PutSwitchIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *Switch
 	JSON400      *Error
+	JSON401      *Error
 	JSON404      *Error
 	JSON500      *Error
 }
@@ -892,6 +904,7 @@ type PostSwitchIdDisableResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Switch
+	JSON401      *Error
 	JSON404      *Error
 	JSON500      *Error
 }
@@ -916,6 +929,7 @@ type PostSwitchIdResetResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Switch
+	JSON401      *Error
 	JSON404      *Error
 	JSON500      *Error
 }
@@ -939,6 +953,7 @@ func (r PostSwitchIdResetResponse) StatusCode() int {
 type GetVapidResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON401      *Error
 }
 
 // Status returns HTTPResponse.Status
@@ -1108,6 +1123,13 @@ func ParseGetSwitchResponse(rsp *http.Response) (*GetSwitchResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1148,6 +1170,13 @@ func ParsePostSwitchResponse(rsp *http.Response) (*PostSwitchResponse, error) {
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1174,6 +1203,13 @@ func ParseDeleteSwitchIdResponse(rsp *http.Response) (*DeleteSwitchIdResponse, e
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1213,6 +1249,13 @@ func ParseGetSwitchIdResponse(rsp *http.Response) (*GetSwitchIdResponse, error) 
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
@@ -1261,6 +1304,13 @@ func ParsePutSwitchIdResponse(rsp *http.Response) (*PutSwitchIdResponse, error) 
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1300,6 +1350,13 @@ func ParsePostSwitchIdDisableResponse(rsp *http.Response) (*PostSwitchIdDisableR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
@@ -1341,6 +1398,13 @@ func ParsePostSwitchIdResetResponse(rsp *http.Response) (*PostSwitchIdResetRespo
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -1371,6 +1435,16 @@ func ParseGetVapidResponse(rsp *http.Response) (*GetVapidResponse, error) {
 	response := &GetVapidResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
 	}
 
 	return response, nil

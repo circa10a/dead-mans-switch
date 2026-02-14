@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=https://goauthentik.io/blueprints/schema.json
+# Blueprint to preconfigure Authentik with a Dead Man's Switch OAuth2 application.
+# This file is automatically applied when mounted into /blueprints/custom/ in the
+# Authentik worker container.
+version: 1
+metadata:
+  name: Dead Man's Switch OAuth2 Setup
+  labels:
+    blueprints.goauthentik.io/instantiate: "true"
+    blueprints.goauthentik.io/description: >-
+      Creates an OAuth2/OpenID Connect provider and application for Dead Man's Switch,
+      plus a service account user with an API token.
+entries:
+  # Create the OAuth2 Provider
+  - model: authentik_providers_oauth2.oauth2provider
+    id: dms-provider
+    state: present
+    identifiers:
+      name: Dead Man's Switch Provider
+    attrs:
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+      client_type: public
+      redirect_uris:
+        - matching_mode: strict
+          url: "http://localhost:8080/"
+      access_code_validity: seconds=600
+      access_token_validity: seconds=86400
+      refresh_token_validity: seconds=2592000
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, "goauthentik.io/providers/oauth2/scope-openid"]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, "goauthentik.io/providers/oauth2/scope-email"]]
+        - !Find [authentik_providers_oauth2.scopemapping, [managed, "goauthentik.io/providers/oauth2/scope-profile"]]
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
+      sub_mode: hashed_user_id
+      issuer_mode: per_provider
+
+  # Create the Application and link it to the provider
+  - model: authentik_core.application
+    id: dms-application
+    state: present
+    identifiers:
+      slug: dead-mans-switch
+    attrs:
+      name: Dead Man's Switch
+      provider: !KeyOf dms-provider
+      policy_engine_mode: any
+
+  # Create a service-account user for machine-to-machine access
+  - model: authentik_core.user
+    id: dms-service-user
+    state: created
+    identifiers:
+      username: dms-service-account
+    attrs:
+      name: Dead Man's Switch Service Account
+      email: dms@localhost
+      type: service_account
+      path: goauthentik.io/service-accounts
+      password: !Env [DMS_SERVICE_ACCOUNT_PASSWORD, "dead-mans-switch-service-password"]
+
+  # Create an API token for the service account (for bootstrap/scripting)
+  - model: authentik_core.token
+    id: dms-service-token
+    state: created
+    identifiers:
+      identifier: dms-service-token
+    attrs:
+      user: !KeyOf dms-service-user
+      intent: app_password
+      expiring: false
+      key: !Env [DMS_SERVICE_ACCOUNT_TOKEN, "dms-bootstrap-token"]

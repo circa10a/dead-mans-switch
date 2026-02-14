@@ -845,7 +845,7 @@ func TestDeleteHandleFunc(t *testing.T) {
 		}
 
 		// Verify it's gone from the DB
-		_, err = store.GetByID(*created.Id)
+		_, err = store.GetByID("admin", *created.Id)
 		if err != sql.ErrNoRows {
 			t.Errorf("expected ErrNoRows after delete, got %v", err)
 		}

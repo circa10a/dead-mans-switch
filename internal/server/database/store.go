@@ -10,26 +10,26 @@ const (
 type Store interface {
 	// Init executes the initial schema setup.
 	Init() error
-	// Create persists a new switch and returns the created record.
-	Create(sw api.Switch) (api.Switch, error)
-	// GetAll retrieves a list of switches up to the specified limit.
-	GetAll(limit int) ([]api.Switch, error)
-	// GetByID retrieves a single switch by its unique identifier.
-	GetByID(id int) (api.Switch, error)
-	// GetExpired retrieves switches whose trigger_at time has passed but haven't been sent.
-	GetExpired(limit int) ([]api.Switch, error)
-	// GetEligibleReminders retrieves switches that are approaching expiry but haven't had a reminder sent yet.
-	GetEligibleReminders(limit int) ([]api.Switch, error)
-	// Update updates an existing switch.
-	Update(id int, sw api.Switch) (api.Switch, error)
-	// Delete removes a switch record from the store.
-	Delete(id int) error
-	// Encrypt encrypts sensitive content.
-	EncryptSwitch(*api.Switch) error
-	// Decrypt encrypts sensitive content.
-	DecryptSwitch(*api.Switch) error
-	// Ping verifies the database connection is alive.
-	Ping() error
 	// Close terminates the database connection.
 	Close() error
+	// Create persists a new switch and returns the created record. Uses sw.UserId for ownership.
+	Create(sw api.Switch) (api.Switch, error)
+	// DecryptSwitch decrypts sensitive content.
+	DecryptSwitch(*api.Switch) error
+	// Delete removes a switch record from the store, scoped to the given user.
+	Delete(userID string, id int) error
+	// EncryptSwitch encrypts sensitive content.
+	EncryptSwitch(*api.Switch) error
+	// GetAll retrieves a list of switches up to the specified limit, scoped to the given user.
+	GetAll(userID string, limit int) ([]api.Switch, error)
+	// GetByID retrieves a single switch by its unique identifier, scoped to the given user.
+	GetByID(userID string, id int) (api.Switch, error)
+	// GetEligibleReminders retrieves switches that are approaching expiry but haven't had a reminder sent yet.
+	GetEligibleReminders(limit int) ([]api.Switch, error)
+	// GetExpired retrieves switches whose trigger_at time has passed but haven't been sent.
+	GetExpired(limit int) ([]api.Switch, error)
+	// Ping verifies the database connection is alive.
+	Ping() error
+	// Update updates an existing switch. Uses sw.UserId for ownership scoping.
+	Update(id int, sw api.Switch) (api.Switch, error)
 }

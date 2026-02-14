@@ -33,11 +33,11 @@ func (m *MockStore) Create(sw api.Switch) (api.Switch, error) {
 	return sw, nil
 }
 
-func (m *MockStore) GetAll(limit int) ([]api.Switch, error) {
+func (m *MockStore) GetAll(userID string, limit int) ([]api.Switch, error) {
 	return nil, nil
 }
 
-func (m *MockStore) GetByID(id int) (api.Switch, error) {
+func (m *MockStore) GetByID(userID string, id int) (api.Switch, error) {
 	return api.Switch{}, nil
 }
 
@@ -69,7 +69,7 @@ func (m *MockStore) Update(id int, sw api.Switch) (api.Switch, error) {
 	return sw, nil
 }
 
-func (m *MockStore) Delete(id int) error {
+func (m *MockStore) Delete(userID string, id int) error {
 	m.DeletedCalled = true
 	return m.DeleteFunc(id)
 }

@@ -1,0 +1,76 @@
+services:
+  postgresql:
+    image: postgres:16-alpine
+    container_name: authentik-postgresql
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentik
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    container_name: authentik-redis
+
+  authentik:
+    image: authentik/server:2025.10
+    container_name: authentik-server
+    command: server
+    environment:
+      AUTHENTIK_SECRET_KEY: dead-mans-switch-dev-secret-key
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      # Bootstrap config — skips the initial setup wizard
+      AUTHENTIK_BOOTSTRAP_PASSWORD: deadmanswitch123!
+      AUTHENTIK_BOOTSTRAP_TOKEN: authentik-bootstrap-token
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@dead-mans-switch.local
+      # Service account password for the blueprint-created user
+      DMS_SERVICE_ACCOUNT_PASSWORD: dead-mans-switch-service-password
+      DMS_SERVICE_ACCOUNT_TOKEN: dms-bootstrap-token
+      # File path where the bootstrap script writes OAuth2 credentials
+      CREDENTIALS_FILE: /output/dms-credentials.env
+    volumes:
+      - ./blueprints:/blueprints/custom
+      - ./authentik-bootstrap.sh:/tmp/authentik-bootstrap.sh
+      - .:/output
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    depends_on:
+      - postgresql
+      - redis
+    post_start:
+      - command: /tmp/authentik-bootstrap.sh
+  authentik-worker:
+    image: authentik/server:2025.10
+    container_name: authentik-worker
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: dead-mans-switch-dev-secret-key
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      # Bootstrap config — must match the server container
+      AUTHENTIK_BOOTSTRAP_PASSWORD: deadmanswitch123!
+      AUTHENTIK_BOOTSTRAP_TOKEN: authentik-bootstrap-token
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@dead-mans-switch.local
+      # Service account password for the blueprint-created user
+      DMS_SERVICE_ACCOUNT_PASSWORD: dead-mans-switch-service-password
+      DMS_SERVICE_ACCOUNT_TOKEN: dms-bootstrap-token
+    volumes:
+      - ./blueprints:/blueprints/custom
+    depends_on:
+      - postgresql
+      - redis
+
+volumes:
+  postgres_data:
+    driver: local

@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS switches (
     reminder_sent BOOLEAN DEFAULT 0,
     reminder_threshold TEXT,
     status TEXT NOT NULL,
-    trigger_at INTEGER DEFAULT 0
+    trigger_at INTEGER DEFAULT 0,
+    user_id TEXT NOT NULL DEFAULT 'admin'
 );
 
-CREATE INDEX IF NOT EXISTS idx_pending_active_switches ON switches (status, trigger_at);
+CREATE INDEX IF NOT EXISTS idx_pending_active_switches ON switches (user_id, status, trigger_at);
 `

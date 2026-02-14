@@ -111,3 +111,42 @@ endef
 
 clean:
 	@rm -rf bin/ coverage.out
+
+
+AUTH_COMPOSE := authentik/docker-compose.yaml
+AUTH_CREDS   := authentik/dms-credentials.env
+
+.PHONY: auth auth-up auth-down
+
+# Run authentik + bootstrap
+auth: auth-up build
+	@echo "==> Waiting for Authentik credentials..."
+	@timeout=120; while [ ! -f $(AUTH_CREDS) ] && [ $$timeout -gt 0 ]; do \
+		sleep 2; timeout=$$((timeout - 2)); \
+		printf "."; \
+	done; echo; \
+	if [ ! -f $(AUTH_CREDS) ]; then \
+		echo "ERROR: Timed out waiting for $(AUTH_CREDS)"; \
+		docker compose -f $(AUTH_COMPOSE) logs authentik 2>&1 | tail -30; \
+		exit 1; \
+	fi
+	@echo ""
+	@docker compose -f $(AUTH_COMPOSE) logs authentik 2>&1 | sed -n '/═══/,/═══/p' | head -21
+	@echo ""
+	@echo "==> Loading credentials..."
+	@. ./$(AUTH_CREDS) && echo "  Client ID:  $$CLIENT_ID" && echo "  Issuer URL: $$ISSUER_URL" && echo "" && \
+	./bin/$(REPO) server \
+		--auth-enabled \
+		--auth-issuer-url "$$ISSUER_URL" \
+		--auth-audience "$$CLIENT_ID" \
+		--port 8080
+
+# Start Authentik
+auth-up:
+	@echo "==> Starting Authentik..."
+	@docker compose -f $(AUTH_COMPOSE) up -d
+
+# Stop Authentik
+auth-down:
+	@echo "==> Stopping Authentik..."
+	@docker compose -f $(AUTH_COMPOSE) down

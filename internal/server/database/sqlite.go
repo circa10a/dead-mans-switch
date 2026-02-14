@@ -26,8 +26,16 @@ import (
 const (
 	sqliteDBName = "switches_sqlite.db"
 	// switchColumns centralizes the field list to prevent Scan errors
-	switchColumns = `id, check_in_interval, delete_after_triggered, encrypted, failure_reason, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at`
+	switchColumns = `id, check_in_interval, delete_after_triggered, encrypted, failure_reason, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at, user_id`
 )
+
+// getUserID extracts the user ID from a switch, defaulting to "admin".
+func getUserID(sw api.Switch) string {
+	if sw.UserId != nil && *sw.UserId != "" {
+		return *sw.UserId
+	}
+	return "admin"
+}
 
 // SQLiteStore is an implementation of the Store interface for SQLite.
 type SQLiteStore struct {
@@ -103,8 +111,10 @@ func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
 		}
 	}
 
-	query := `INSERT INTO switches (check_in_interval, delete_after_triggered, encrypted, failure_reason, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	userID := getUserID(sw)
+
+	query := `INSERT INTO switches (check_in_interval, delete_after_triggered, encrypted, failure_reason, message, notifiers, push_subscription, reminder_enabled, reminder_sent, reminder_threshold, status, trigger_at, user_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	res, err := s.db.Exec(query,
 		sw.CheckInInterval,
@@ -119,6 +129,7 @@ func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
 		sw.ReminderThreshold,
 		sw.Status,
 		sw.TriggerAt,
+		userID,
 	)
 	if err != nil {
 		return api.Switch{}, err
@@ -129,14 +140,14 @@ func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
 		return api.Switch{}, err
 	}
 
-	return s.GetByID(int(id))
+	return s.GetByID(userID, int(id))
 }
 
-// GetAll returns all switch records in the database up to the provided limit.
-func (s *SQLiteStore) GetAll(limit int) ([]api.Switch, error) {
-	query := fmt.Sprintf("SELECT %s FROM switches ORDER BY id DESC LIMIT ?", switchColumns)
+// GetAll returns all switch records in the database up to the provided limit, scoped to the given user.
+func (s *SQLiteStore) GetAll(userID string, limit int) ([]api.Switch, error) {
+	query := fmt.Sprintf("SELECT %s FROM switches WHERE user_id = ? ORDER BY id DESC LIMIT ?", switchColumns)
 
-	rows, err := s.db.Query(query, limit)
+	rows, err := s.db.Query(query, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -146,9 +157,9 @@ func (s *SQLiteStore) GetAll(limit int) ([]api.Switch, error) {
 	return s.scanSwitches(rows)
 }
 
-// GetByID returns a single switch by its ID, returning sql.ErrNoRows if not found.
-func (s *SQLiteStore) GetByID(id int) (api.Switch, error) {
-	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE id = ?", switchColumns), id)
+// GetByID returns a single switch by its ID, scoped to the given user. Returns sql.ErrNoRows if not found.
+func (s *SQLiteStore) GetByID(userID string, id int) (api.Switch, error) {
+	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE user_id = ? AND id = ?", switchColumns), userID, id)
 	if err != nil {
 		return api.Switch{}, err
 	}
@@ -248,7 +259,9 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		}
 	}
 
-	query := `UPDATE switches SET check_in_interval=?, delete_after_triggered=?, encrypted=?, failure_reason=?, message=?, notifiers=?, push_subscription=?, reminder_enabled=?, reminder_sent=?, reminder_threshold=?, status=?, trigger_at=? WHERE id=?`
+	userID := getUserID(sw)
+
+	query := `UPDATE switches SET check_in_interval=?, delete_after_triggered=?, encrypted=?, failure_reason=?, message=?, notifiers=?, push_subscription=?, reminder_enabled=?, reminder_sent=?, reminder_threshold=?, status=?, trigger_at=? WHERE id=? AND user_id=?`
 
 	res, err := s.db.Exec(
 		query,
@@ -265,6 +278,7 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		sw.Status,
 		sw.TriggerAt,
 		id,
+		userID,
 	)
 	if err != nil {
 		return api.Switch{}, err
@@ -279,23 +293,13 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 		return api.Switch{}, sql.ErrNoRows
 	}
 
-	return s.GetByID(id)
+	return s.GetByID(userID, id)
 }
 
-// Delete permanently removes a switch from the database.
-func (s *SQLiteStore) Delete(id int) error {
-	_, err := s.db.Exec(`DELETE FROM switches WHERE id = ?`, id)
+// Delete permanently removes a switch from the database, scoped to the given user.
+func (s *SQLiteStore) Delete(userID string, id int) error {
+	_, err := s.db.Exec(`DELETE FROM switches WHERE id = ? AND user_id = ?`, id, userID)
 	return err
-}
-
-// ReminderSent marks the reminder on the switch with the given ID as sent.
-func (s *SQLiteStore) ReminderSent(id int) (api.Switch, error) {
-	_, err := s.db.Exec(`UPDATE switches SET reminder_sent = 1 WHERE id = ?`, id)
-	if err != nil {
-		return api.Switch{}, fmt.Errorf("failed to mark reminder as sent: %w", err)
-	}
-
-	return s.GetByID(id)
 }
 
 // Close closes the connection to the SQLite database.
@@ -325,6 +329,7 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		var reminderEnabled sql.NullBool
 		var reminderThresholdRaw sql.NullString
 		var reminderSent sql.NullBool
+		var userIDRaw sql.NullString
 
 		err := rows.Scan(
 			&sw.Id,
@@ -340,6 +345,7 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 			&reminderThresholdRaw,
 			&sw.Status,
 			&sw.TriggerAt,
+			&userIDRaw,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan error: %w", err)
@@ -364,6 +370,9 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 		}
 		if reminderSent.Valid {
 			sw.ReminderSent = &reminderSent.Bool
+		}
+		if userIDRaw.Valid {
+			sw.UserId = &userIDRaw.String
 		}
 
 		// Field Mapping

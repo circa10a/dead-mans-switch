@@ -2,7 +2,59 @@
 
 This doc provides guidelines for AI agents working on this codebase to maintain :sparkles: consistency :sparkles: and quality standards.
 
+## Generated code
+
+`api/gen.go` should never be modified by hand. `go generate ./...` will render changes in that file based on changes to `api/openapi.yaml`.
+
+
+## Security
+
+When changes are made, `gosec ./...` should pass without error. Should errors be encountered, fix them properly. Do not insert comments to ignore the issues.
+
+## Linting
+
+All code introduced should pass `golangci-lint run -v` without error. Should errors be encountered, fix them properly. Do not insert comments to ignore the issues.
+
 ## Go-Specific Syntax Rules
+
+### Configuration and Code Organization
+
+**Rule**: Configuration struct fields and CLI flag definitions must be alphabetically sorted by name.
+
+**Good**:
+```go
+type Config struct {
+	AutoTLS           bool
+	ContactEmail      string
+	DemoMode          bool
+	Port              int
+	StorageDir        string
+	Validation        bool
+}
+
+serverFlags := []flagDef{
+	{Name: autoTLSKey, ...},
+	{Name: contactEmailKey, ...},
+	{Name: demoModeKey, ...},
+	{Name: portKey, ...},
+	{Name: storageDirKey, ...},
+	{Name: validationKey, ...},
+}
+```
+
+**Bad**:
+```go
+type Config struct {
+	ContactEmail      string
+	AutoTLS           bool
+	Validation        bool
+	Port              int
+	DemoMode          bool
+	StorageDir        string
+}
+```
+
+This ensures consistency across the codebase and makes it easier to find configuration options.
 
 ### Error Handling
 

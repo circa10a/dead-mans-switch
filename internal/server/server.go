@@ -57,6 +57,9 @@ type Server struct {
 
 // Config holds configuration for creating a Server.
 type Config struct {
+	AuthEnabled       bool
+	AuthIssuerURL     string
+	AuthAudience      string
 	AutoTLS           bool
 	ContactEmail      string
 	DemoMode          bool
@@ -173,6 +176,27 @@ func New(cfg *Config) (*Server, error) {
 		server.middlewares = append(server.middlewares, middleware.Prometheus)
 	}
 
+	// JWT Authentication
+	var jwtValidator *middleware.JWTValidator
+	if server.AuthEnabled {
+		var err error
+		publicKeys, err := middleware.FetchPublicKeys(server.AuthIssuerURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch public keys from issuer: %w", err)
+		}
+
+		jwtValidator = &middleware.JWTValidator{
+			Enabled:    true,
+			IssuerURL:  server.AuthIssuerURL,
+			Audience:   server.AuthAudience,
+			PublicKeys: publicKeys,
+		}
+	} else {
+		jwtValidator = &middleware.JWTValidator{
+			Enabled: false,
+		}
+	}
+
 	// Default middlewares
 	server.mux = middleware.Logging(server.logger, server.mux)
 
@@ -182,6 +206,13 @@ func New(cfg *Config) (*Server, error) {
 	}
 
 	// Routes
+	// Auth configuration endpoint (unauthenticated so UI can discover OIDC settings)
+	authHandler := &handlers.Auth{
+		Audience:  server.AuthAudience,
+		Enabled:   server.AuthEnabled,
+		IssuerURL: server.AuthIssuerURL,
+	}
+
 	// Health check
 	healthHandler := &handlers.Health{
 		Store: db,
@@ -210,27 +241,37 @@ func New(cfg *Config) (*Server, error) {
 
 	// Mount API v1 routes
 	router.Route("/api/v1", func(r chi.Router) {
-		// Group routes that require the validation middlewares
+		// Unauthenticated routes
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.SwitchValidator(validator))
-			r.Use(middleware.NotifierValidator)
-
-			r.Post("/switch", switchHandler.PostHandleFunc)
-			r.Put("/switch/{id}", switchHandler.PutByIDHandleFunc)
+			r.Get("/auth/config", authHandler.GetConfigHandleFunc)
 		})
 
-		// Standard routes (No body validation needed)
-		r.Get("/switch", switchHandler.GetHandleFunc)
-		r.Get("/switch/{id}", switchHandler.GetByIDHandleFunc)
-		r.Delete("/switch/{id}", switchHandler.DeleteHandleFunc)
-		r.Post("/switch/{id}/reset", switchHandler.ResetHandleFunc)
-		r.Post("/switch/{id}/disable", switchHandler.DisableHandleFunc)
+		// Apply JWT auth middleware to authenticated routes
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.JWTAuth(jwtValidator))
 
-		// VAPID key for push notifications
-		r.Get("/vapid", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/plain")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(server.VAPIDPublicKey))
+			// Group routes that require the validation middlewares
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.SwitchValidator(validator))
+				r.Use(middleware.NotifierValidator)
+
+				r.Post("/switch", switchHandler.PostHandleFunc)
+				r.Put("/switch/{id}", switchHandler.PutByIDHandleFunc)
+			})
+
+			// Standard routes (No body validation needed)
+			r.Get("/switch", switchHandler.GetHandleFunc)
+			r.Get("/switch/{id}", switchHandler.GetByIDHandleFunc)
+			r.Delete("/switch/{id}", switchHandler.DeleteHandleFunc)
+			r.Post("/switch/{id}/reset", switchHandler.ResetHandleFunc)
+			r.Post("/switch/{id}/disable", switchHandler.DisableHandleFunc)
+
+			// VAPID key for push notifications
+			r.Get("/vapid", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/plain")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(server.VAPIDPublicKey))
+			})
 		})
 	})
 
@@ -240,13 +281,16 @@ func New(cfg *Config) (*Server, error) {
 		return server, err
 	}
 	fileServer := http.FileServer(http.FS(publicFS))
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		content, _ := webAssets.ReadFile("web/index.html")
-		w.Header().Set("Content-Type", "text/html")
-		_, _ = w.Write(content)
+
+	router.Route("/", func(r chi.Router) {
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+			content, _ := webAssets.ReadFile("web/index.html")
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write(content)
+		})
+		r.Handle("/*", fileServer)
 	})
 
-	router.Handle("/*", fileServer)
 	return server, nil
 }
 
