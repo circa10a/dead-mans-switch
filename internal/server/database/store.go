@@ -4,6 +4,7 @@ import "github.com/circa10a/dead-mans-switch/api"
 
 const (
 	secretName = "switches_encryption.key"
+	AdminUser  = "admin"
 )
 
 // Store defines the behaviors required for persisting and managing dead man switches.

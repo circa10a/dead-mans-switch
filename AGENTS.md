@@ -61,6 +61,10 @@ The following files are **all generated** — never modify them by hand:
 | `make monitoring` / `monitoring-down` | Start/stop Prometheus + Grafana + Loki stack |
 | `make auth` / `auth-down` | Start/stop local Authentik OIDC provider |
 
+## Version control
+
+NEVER stage, commit, or push changes. Never.
+
 ## Security
 
 When changes are made, `gosec ./...` should pass without error. Should errors be encountered, fix them properly. Do not insert comments to ignore the issues.

@@ -1,4 +1,15 @@
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dead-mans-switch-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,3 +37,26 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: dead-mans-switch-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dead-mans-switch
+  labels:
+    app: dead-mans-switch
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+  selector:
+    app: dead-mans-switch
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dead-mans-switch
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: dead-mans-switch

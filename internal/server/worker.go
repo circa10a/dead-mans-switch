@@ -17,84 +17,80 @@ import (
 	"golang.org/x/text/language"
 )
 
-const (
-	adminUser = "admin"
-)
-
-// Worker periodically processes expired switches and sends notifications.
-type Worker struct {
-	Store           database.Store
-	BatchSize       int
-	Interval        time.Duration
-	Logger          *slog.Logger
-	SubscriberEmail string
-	VAPIDPrivateKey string
-	VAPIDPublicKey  string
+// worker periodically processes expired switches and sends notifications.
+type worker struct {
+	store           database.Store
+	batchSize       int
+	interval        time.Duration
+	logger          *slog.Logger
+	subscriberEmail string
+	vapidPrivateKey string
+	vapidPublicKey  string
 }
 
-// Start begins the worker's processing loop.
-func (w *Worker) Start(ctx context.Context) {
-	ticker := time.NewTicker(w.Interval)
+// start begins the worker's processing loop.
+func (w *worker) start(ctx context.Context) {
+	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 
-	w.Logger.Info("Starting notification worker", "interval", w.Interval.String())
+	w.logger.Info("Starting notification worker", "interval", w.interval.String())
 
 	for {
 		select {
 		case <-ctx.Done():
-			w.Logger.Info("Stopping notification worker")
+			w.logger.Info("Stopping notification worker")
 			return
 		case <-ticker.C:
-			w.Logger.Debug("Checking for expired switches")
+			w.logger.Debug("Checking for expired switches")
 			w.sweep()
-			w.Logger.Debug(fmt.Sprintf("Completed sweep for expired switches, next check at %s", time.Now().Add(w.Interval).Format(time.RFC3339)))
+			w.logger.Debug(fmt.Sprintf("Completed sweep for expired switches, next check at %s", time.Now().Add(w.interval).Format(time.RFC3339)))
 		}
 	}
 }
 
 // Sweep processes expired switches in batches.
-func (w *Worker) sweep() {
+func (w *worker) sweep() {
 	// Reminders
-	reminders, err := w.Store.GetEligibleReminders(w.BatchSize)
+	reminders, err := w.store.GetEligibleReminders(w.batchSize)
 	if err != nil {
-		w.Logger.Error("Failed to fetch eligible reminders", "error", err)
+		w.logger.Error("Failed to fetch eligible reminders", "error", err)
 		return
 	}
 
-	w.Logger.Debug("Fetched eligible reminders", "count", len(reminders))
+	w.logger.Debug("Fetched eligible reminders", "count", len(reminders))
 
 	for _, sw := range reminders {
 		err = w.processReminder(sw)
 		if err != nil {
-			w.Logger.Error("Could not send reminder", "error", err, "id", sw.Id)
+			w.logger.Error("Could not send reminder", "error", err, "id", sw.Id)
 		}
 	}
 
 	// Switches
-	expired, err := w.Store.GetExpired(w.BatchSize)
+	expired, err := w.store.GetExpired(w.batchSize)
 	if err != nil {
-		w.Logger.Error("Failed to fetch expired switches", "error", err)
+		w.logger.Error("Failed to fetch expired switches", "error", err)
 		return
 	}
 
-	w.Logger.Debug("Fetched expired switches", "count", len(expired))
+	w.logger.Debug("Fetched expired switches", "count", len(expired))
 
 	for _, sw := range expired {
 		err = w.processExpiredSwitch(sw)
 		if err != nil {
-			w.Logger.Error("Could not process expired switch", "error", err, "id", sw.Id)
+			w.logger.Error("Could not process expired switch", "error", err, "id", sw.Id)
 		}
 	}
 }
 
 // processExpiredSwitch sends notifications for expired switches.
-func (w *Worker) processExpiredSwitch(sw api.Switch) error {
-	w.Logger.Info("Switch expired, sending final notifications", "id", *sw.Id)
+func (w *worker) processExpiredSwitch(sw api.Switch) error {
+	w.logger.Info("Switch expired, sending final notifications", "id", *sw.Id)
 
 	// Send External Notifiers (Shoutrrr)
 	sendErr := w.sendNotifiers(sw)
 	if sendErr != nil {
-		w.Logger.Error("Failed to send notifications", "id", *sw.Id, "error", sendErr)
+		w.logger.Error("Failed to send notifications", "id", *sw.Id, "error", sendErr)
 
 		// Set as failed if not already
 		if sw.Status == nil || *sw.Status != api.SwitchStatusFailed {
@@ -103,7 +99,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 			failureMsg := cases.Title(language.English).String(sendErr.Error())
 			sw.FailureReason = &failureMsg
 
-			_, err := w.Store.Update(*sw.Id, sw)
+			_, err := w.store.Update(*sw.Id, sw)
 			if err != nil {
 				return err
 			}
@@ -118,31 +114,31 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 
 	// Send Web Push to the Owner (if subscribed)
 	if sw.PushSubscription != nil {
-		w.Logger.Debug("Switch expired, sending web push alert", "id", *sw.Id)
+		w.logger.Debug("Switch expired, sending web push alert", "id", *sw.Id)
 		err := w.sendWebPush(sw, "Switch Activated", "Your switch has triggered and notifications have been sent.")
 		if err != nil {
-			w.Logger.Error("Failed to send expiration web push", "id", *sw.Id, "error", err)
+			w.logger.Error("Failed to send expiration web push", "id", *sw.Id, "error", err)
 		}
 	}
 
 	if *sw.DeleteAfterTriggered {
-		w.Logger.Debug("Auto-deleting switch after triggering", "id", *sw.Id)
+		w.logger.Debug("Auto-deleting switch after triggering", "id", *sw.Id)
 
-		userID := adminUser
+		userID := database.AdminUser
 		if sw.UserId != nil {
 			userID = *sw.UserId
 		}
-		err := w.Store.Delete(userID, *sw.Id)
+		err := w.store.Delete(userID, *sw.Id)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
 
-	w.Logger.Debug("Marking switch as triggered", "id", *sw.Id)
+	w.logger.Debug("Marking switch as triggered", "id", *sw.Id)
 	statusTriggered := api.SwitchStatusTriggered
 	sw.Status = &statusTriggered
-	_, err := w.Store.Update(*sw.Id, sw)
+	_, err := w.store.Update(*sw.Id, sw)
 	if err != nil {
 		return err
 	}
@@ -151,7 +147,7 @@ func (w *Worker) processExpiredSwitch(sw api.Switch) error {
 }
 
 // processReminder sends reminders.
-func (w *Worker) processReminder(sw api.Switch) error {
+func (w *worker) processReminder(sw api.Switch) error {
 	if sw.ReminderThreshold == nil || *sw.ReminderThreshold == "" {
 		return nil
 	}
@@ -171,7 +167,7 @@ func (w *Worker) processReminder(sw api.Switch) error {
 	// reminderDur.Seconds() gives us the threshold in seconds
 	thresholdTime := *sw.TriggerAt - int64(reminderDur.Seconds())
 
-	w.Logger.Debug("Evaluating reminder eligibility",
+	w.logger.Debug("Evaluating reminder eligibility",
 		"id", *sw.Id,
 		"threshold", time.Unix(thresholdTime, 0).Format(time.RFC3339),
 		"TriggerAt", time.Unix(*sw.TriggerAt, 0).Format(time.RFC3339),
@@ -179,7 +175,7 @@ func (w *Worker) processReminder(sw api.Switch) error {
 
 	// If we are past the threshold AND the switch hasn't actually expired yet
 	if now >= thresholdTime {
-		w.Logger.Debug("Reminder threshold met, triggering web push", "id", *sw.Id)
+		w.logger.Debug("Reminder threshold met, triggering web push", "id", *sw.Id)
 
 		// Calculate time string for the message
 		diff := *sw.TriggerAt - now
@@ -194,12 +190,12 @@ func (w *Worker) processReminder(sw api.Switch) error {
 			return err
 		}
 
-		w.Logger.Debug("Marking reminder as sent in database", "id", *sw.Id)
+		w.logger.Debug("Marking reminder as sent in database", "id", *sw.Id)
 
 		v := true
 		sw.ReminderSent = &v
 
-		_, reminderSentErr := w.Store.Update(*sw.Id, sw)
+		_, reminderSentErr := w.store.Update(*sw.Id, sw)
 		return reminderSentErr
 	}
 
@@ -207,7 +203,7 @@ func (w *Worker) processReminder(sw api.Switch) error {
 }
 
 // sendNotifiers triggers configured notifiers
-func (w *Worker) sendNotifiers(sw api.Switch) error {
+func (w *worker) sendNotifiers(sw api.Switch) error {
 	var errs []error
 
 	for _, url := range sw.Notifiers {
@@ -234,13 +230,13 @@ func (w *Worker) sendNotifiers(sw api.Switch) error {
 
 // sendWebPush sends a web push notification.
 // Modified to accept title and body to support both Reminders and Expirations.
-func (w *Worker) sendWebPush(sw api.Switch, title, body string) error {
+func (w *worker) sendWebPush(sw api.Switch, title, body string) error {
 	if sw.PushSubscription == nil || sw.PushSubscription.Endpoint == nil {
-		w.Logger.Debug("Skipping web push: no subscription found", "id", *sw.Id)
+		w.logger.Debug("Skipping web push: no subscription found", "id", *sw.Id)
 		return nil
 	}
 
-	w.Logger.Debug("Preparing web push payload", "id", *sw.Id, "endpoint", *sw.PushSubscription.Endpoint)
+	w.logger.Debug("Preparing web push payload", "id", *sw.Id, "endpoint", *sw.PushSubscription.Endpoint)
 
 	s := &webpush.Subscription{
 		Endpoint: *sw.PushSubscription.Endpoint,
@@ -268,9 +264,9 @@ func (w *Worker) sendWebPush(sw api.Switch, title, body string) error {
 	}
 
 	resp, err := webpush.SendNotification(payload, s, &webpush.Options{
-		VAPIDPublicKey:  w.VAPIDPublicKey,
-		VAPIDPrivateKey: w.VAPIDPrivateKey,
-		Subscriber:      w.SubscriberEmail,
+		VAPIDPublicKey:  w.vapidPublicKey,
+		VAPIDPrivateKey: w.vapidPrivateKey,
+		Subscriber:      w.subscriberEmail,
 		TTL:             3600,
 		Urgency:         webpush.UrgencyHigh,
 	})
@@ -283,13 +279,13 @@ func (w *Worker) sendWebPush(sw api.Switch, title, body string) error {
 		if err != nil {
 			return errors.New("could not read web push body")
 		}
-		w.Logger.Debug("Web push not sent", "id", *sw.Id, "status_code", resp.StatusCode, "body", string(bodyBytes))
+		w.logger.Debug("Web push not sent", "id", *sw.Id, "status_code", resp.StatusCode, "body", string(bodyBytes))
 		return fmt.Errorf("could not send web push: %d", resp.StatusCode)
 	}
 
 	defer func() { _ = resp.Body.Close() }()
 
-	w.Logger.Debug("Web push sent", "id", *sw.Id, "status_code", resp.StatusCode)
+	w.logger.Debug("Web push sent", "id", *sw.Id, "status_code", resp.StatusCode)
 
 	return nil
 }

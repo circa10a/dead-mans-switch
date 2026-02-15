@@ -240,7 +240,7 @@ func TestSQLiteStore_StatusAndExpirations(t *testing.T) {
 }
 
 func TestSQLiteStore_SwitchCryptoHelpers(t *testing.T) {
-	store := setupTestStore(t).(*SQLiteStore)
+	store := setupTestStore(t).(*sqliteStore)
 
 	plaintextMsg := "secure message"
 	notifiers := []string{"https://webhook.site/123"}
@@ -288,7 +288,7 @@ func TestSQLiteStore_SwitchCryptoHelpers(t *testing.T) {
 
 func TestEncryptionPrimitives(t *testing.T) {
 	key := []byte("this-is-a-32-byte-long-test-key!")
-	store := &SQLiteStore{EncryptionKey: key}
+	store := &sqliteStore{encryptionKey: key}
 	plaintext := []byte("Hello, Dead Man's Switch!")
 
 	t.Run("successfully encrypts and decrypts", func(t *testing.T) {

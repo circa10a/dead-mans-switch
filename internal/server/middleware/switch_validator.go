@@ -16,9 +16,9 @@ import (
 // contextKey is a private type to avoid collisions in context
 type contextKey string
 
-// SwitchContextKey is the context key for accessing the value of a validated switch in
+// switchContextKey is the context key for accessing the value of a validated switch in
 const (
-	SwitchContextKey contextKey = "validatedSwitch"
+	switchContextKey contextKey = "validatedSwitch"
 )
 
 // ValidatedSwitch contains parsed payload/time fields to prevent parsing twice.
@@ -31,7 +31,7 @@ type ValidatedSwitch struct {
 // FromContext grabs a Switch payload from the context to ensure we only read the body once
 // since we read the body to perform validation in this middleware.
 func FromContext(ctx context.Context) (ValidatedSwitch, bool) {
-	sw, ok := ctx.Value(SwitchContextKey).(ValidatedSwitch)
+	sw, ok := ctx.Value(switchContextKey).(ValidatedSwitch)
 	return sw, ok
 }
 
@@ -97,7 +97,7 @@ func SwitchValidator(v *validator.Validate) func(http.Handler) http.Handler {
 				ReminderThresholdDuration: reminderThresholdDuration,
 			}
 
-			ctx := context.WithValue(r.Context(), SwitchContextKey, validatedData)
+			ctx := context.WithValue(r.Context(), switchContextKey, validatedData)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

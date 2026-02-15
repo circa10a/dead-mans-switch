@@ -26,7 +26,7 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
       # Bootstrap config — skips the initial setup wizard
-      AUTHENTIK_BOOTSTRAP_PASSWORD: deadmanswitch123!
+      AUTHENTIK_BOOTSTRAP_PASSWORD: akadmin
       AUTHENTIK_BOOTSTRAP_TOKEN: authentik-bootstrap-token
       AUTHENTIK_BOOTSTRAP_EMAIL: admin@dead-mans-switch.local
       # Service account password for the blueprint-created user
@@ -59,7 +59,7 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
       # Bootstrap config — must match the server container
-      AUTHENTIK_BOOTSTRAP_PASSWORD: deadmanswitch123!
+      AUTHENTIK_BOOTSTRAP_PASSWORD: akadmin
       AUTHENTIK_BOOTSTRAP_TOKEN: authentik-bootstrap-token
       AUTHENTIK_BOOTSTRAP_EMAIL: admin@dead-mans-switch.local
       # Service account password for the blueprint-created user

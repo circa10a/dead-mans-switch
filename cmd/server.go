@@ -97,7 +97,7 @@ func init() {
 		{Name: autoTLSKey, Shorthand: "a", Type: "bool", Default: false, Usage: "Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation.", ViperKey: autoTLSKey},
 		{Name: contactEmailKey, Shorthand: "", Type: "string", Default: "user@dead-mans-switch.com", Usage: "Email used for TLS cert registration + push notification point of contact (not required).", ViperKey: contactEmailKey},
 		{Name: demoModeKey, Shorthand: "", Type: "bool", Default: false, Usage: "Enable demo mode which creates sample switches on startup and resets the database periodically.", ViperKey: demoModeKey},
-		{Name: demoPResetIntervalKey, Shorthand: "", Type: "duration", Default: 6 * time.Hour, Usage: "How often to reset the database with fresh sample switches when in demo mode.", ViperKey: demoPResetIntervalKey},
+		{Name: demoPResetIntervalKey, Shorthand: "", Type: "duration", Default: 1 * time.Hour, Usage: "How often to reset the database with fresh sample switches when in demo mode.", ViperKey: demoPResetIntervalKey},
 		{Name: domainsKey, Shorthand: "d", Type: "stringArray", Default: []string{}, Usage: "Domains to issue certificate for. Must be used with --auto-tls.", ViperKey: domainsKey},
 		{Name: logFormatKey, Shorthand: "f", Type: "string", Default: "text", Usage: "Server logging format. Supported values are 'text' and 'json'.", ViperKey: logFormatKey},
 		{Name: logLevelKey, Shorthand: "l", Type: "string", Default: "info", Usage: "Server logging level.", ViperKey: logLevelKey},
@@ -107,10 +107,10 @@ func init() {
 		{Name: tlsCertificateKey, Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS certificate. Cannot be used with --auto-tls.", ViperKey: tlsCertificateKey},
 		{Name: tlsKeyKey, Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS key. Cannot be used with --auto-tls.", ViperKey: tlsKeyKey},
 		{Name: workerBatchSizeKey, Shorthand: "", Type: "int", Default: 1000, Usage: "How many notification records to process at a time.", ViperKey: workerBatchSizeKey},
-		{Name: workerIntervalKey, Shorthand: "", Type: "duration", Default: 5 * time.Minute, Usage: "How often to check for expired switches.", ViperKey: workerIntervalKey},
+		{Name: workerIntervalKey, Shorthand: "", Type: "duration", Default: 1 * time.Minute, Usage: "How often to check for expired switches.", ViperKey: workerIntervalKey},
 	}
 
-	RegisterFlagTypes(serverCmd, serverFlags)
+	registerFlagTypes(serverCmd, serverFlags)
 
 	viper.SetEnvPrefix(strings.ToUpper(envVarPrefix))
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))

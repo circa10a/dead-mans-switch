@@ -32,6 +32,9 @@ go.work.sum
 # env file
 .env
 
+# Config file (may contain secrets; example file is tracked)
+dead-mans-switch.yaml
+
 # registry packages
 *.zip
 *.sig
@@ -52,4 +55,4 @@ data/
 tmp
 
 # Authentik
-./authentik/dms-credentials.env
+dms-credentials.env

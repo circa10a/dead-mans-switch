@@ -1,21 +1,34 @@
-# dead-mans-switch
+# ☠️ dead-mans-switch
+
+**Dead Man's Switch** is an all one self-hosted app for creating a "Dead Man's Switch". Create switch via the UI, API, or CLI that sends a message via many providers if you don't "check-in" by resetting your timer(s).
 
 ![Build Status](https://github.com/circa10a/dead-mans-switch/workflows/deploy/badge.svg)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/circa10a/dead-mans-switch)
 
-<img width="45%" src="" align="right" style="margin-left: 20px"/>
-
-**Dead Man's Switch** is an all one self-hosted app for creating a "Dead Man's Switch". Create switch via the UI, API, or CLI that sends a message via many providers if you don't "check-in" by resetting your timer(s).
+<img width="45%" height="45%" src="docs/images/grim_gopher.png" align="right"/>
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
 - [Features](#features)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
 - [Guides](#guides)
 - [CLI Reference](#cli-reference)
 - [Deployment](#deployment)
 - [Development](#development)
 - [License](#license)
+
+## Background
+
+I have several personal use cases for this so I made this to run for myself. Maybe you'll like it too.
+
+## Features
+
+- **Multi-channel alerting** — Notify via push, email, webhook, and more. Never miss an expired switch. Powered by [Shoutrrr](https://shoutrrr.nickfedor.com/latest)
+- **Push notifications** — Check in via real-time push notifications on mobile or desktop before a switch expires as your chosen threshold.
+- **Zero-dependency deployment** — UI, CLI, and API ship as a single binary. No runtime dependencies, no sidecar services. Just run it.
+- **Secure** — Automatic TLS via [CertMagic](https://github.com/caddyserver/certmagic), with optional [Authentik](https://goauthentik.io/) OIDC integration for multi-user setups, optional encryption per switch.
+- **Full observability** — Prometheus metrics and structured JSON logging
 
 ## Quick Start
 
@@ -53,17 +66,43 @@ docker run -v -p 8443:8443 $PWD/certs:/certs $PWD/dead-mans-switch-data:/data ci
 > [!CAUTION]
 > The `--storage-dir` directory contains your database and VAPID keys. Deleting or losing this directory will permanently destroy all switches and break existing push notification subscriptions. **Back it up.**
 
-## Features
+## Configuration
 
-- **Multi-channel alerting** — Notify via push, email, webhook, and more. Never miss an expired switch. Powered by [Shoutrrr](https://shoutrrr.nickfedor.com/latest)
-- **Push notifications** — Get real-time browser alerts on mobile or desktop when a switch expires, even if the tab is closed.
-- **Zero-dependency deployment** — UI, CLI, and API ship as a single binary. No runtime dependencies, no sidecar services. Just run it.
-- **Secure by default** — Automatic TLS via [CertMagic](https://github.com/caddyserver/certmagic), with optional [Authentik](https://goauthentik.io/) OIDC integration for multi-user setups.
-- **Full observability** — Prometheus metrics and structured JSON logging
+The server can be configured via **CLI flags**, **environment variables**, or a **YAML config file**. When multiple sources set the same value, the precedence order is:
+
+**CLI flags > Environment variables > Config file > Defaults**
+
+### Config File
+
+Place a `dead-mans-switch.yaml` file in the current working directory or your home directory and it will be loaded automatically. You can also specify a path explicitly:
+
+```bash
+dead-mans-switch server --config /path/to/config.yaml
+```
+
+Example config (see [`dead-mans-switch.example.yaml`](dead-mans-switch.example.yaml) for all options):
+
+```yaml
+port: 8080
+log-level: info
+log-format: json
+storage-dir: ./data
+metrics: true
+
+auth-enabled: true
+auth-issuer-url: https://auth.example.com/application/o/dead-mans-switch/
+auth-audience: my-client-id
+
+worker-interval: 1m
+worker-batch-size: 1000
+```
+
+Config keys match CLI flag names (hyphenated). Every flag also has a corresponding environment variable with the `DEAD_MANS_SWITCH_` prefix (e.g. `DEAD_MANS_SWITCH_PORT`).
 
 ## Guides
 
-- [Authentik Integration](guides/AUTHENTIK_INTEGRATION.md) — Set up OIDC authentication with Authentik
+- [Authentik Integration](docs.guides/AUTHENTIK_INTEGRATION.md) — Set up OIDC authentication with Authentik
+- [Tailscale + MagicDNS HTTPS](docs.guides/TAILSCALE_INTEGRATION.md) — Private HTTPS via Tailscale without exposing to the internet
 
 ### API Documentation
 
@@ -117,7 +156,7 @@ Usage:
 
 Flags:
       --auth-audience string           Expected JWT audience claim. (env: DEAD_MANS_SWITCH_AUTH_AUDIENCE)
-      --auth-enabled                   Enable JWT authentication via Authentik. (env: DEAD_MANS_SWITCH_AUTH_ENABLED)
+      --auth-enabled                   Enable JWT authentication via OIDC. (env: DEAD_MANS_SWITCH_AUTH_ENABLED)
       --auth-issuer-url string         Identity provider OAuth2 issuer URL. (env: DEAD_MANS_SWITCH_AUTH_ISSUER_URL)
   -a, --auto-tls                       Enable automatic TLS via Let's Encrypt. Requires port 80/443 open to the internet for domain validation. (env: DEAD_MANS_SWITCH_AUTO_TLS)
       --contact-email string           Email used for TLS cert registration + push notification point of contact (not required). (env: DEAD_MANS_SWITCH_CONTACT_EMAIL) (default "user@dead-mans-switch.com")
@@ -155,11 +194,11 @@ This starts:
 
 ### Kubernetes
 
-Deploy to Kubernetes using the provided manifests:
+Deploy to Kubernetes using the provided manifest:
 
 ```bash
-# Apply the manifests from the repository
-kubectl apply -f https://raw.githubusercontent.com/circa10a/dead-mans-switch/main/deploy/k8s/
+# Apply the manifest
+kubectl apply -f https://raw.githubusercontent.com/circa10a/dead-mans-switch/main/deploy/k8s/manifest.yaml
 
 # Verify deployment
 kubectl get pods -l app=dead-mans-switch
@@ -196,7 +235,7 @@ make run
 make test
 ```
 
-### Run local authentik stack
+### Run local Authentik stack
 
 ```console
 # Start
@@ -206,7 +245,7 @@ make auth
 make auth-down
 ```
 
-### Run Prometheus/Grafana/Loki stack
+### Run local Prometheus/Grafana/Loki stack
 
 ```console
 $ make monitoring

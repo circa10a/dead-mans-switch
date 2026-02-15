@@ -107,7 +107,7 @@ func TestWorker_Sweep_Success(t *testing.T) {
 			SentFunc: func(id int) error { return nil },
 		}
 
-		w := &Worker{Store: mock, BatchSize: 10, Logger: logger}
+		w := &worker{store: mock, batchSize: 10, logger: logger}
 		w.sweep()
 
 		if !mock.SentCalled {
@@ -147,10 +147,10 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 			},
 		}
 
-		w := &Worker{
-			Store:     mock,
-			BatchSize: 10,
-			Logger:    logger,
+		w := &worker{
+			store:     mock,
+			batchSize: 10,
+			logger:    logger,
 			// VAPID keys omitted; webpush.SendNotification will error, but we can verify DB call
 		}
 		w.sweep()
@@ -173,7 +173,7 @@ func TestWorker_Sweep_Reminders(t *testing.T) {
 			},
 		}
 
-		w := &Worker{Store: mock, BatchSize: 10, Logger: logger}
+		w := &worker{store: mock, batchSize: 10, logger: logger}
 		w.sweep()
 
 		if mock.MarkReminderSentCalled {
@@ -201,7 +201,7 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 			SentFunc: func(id int) error { return nil },
 		}
 
-		w := &Worker{Store: mock, BatchSize: 10, Logger: logger}
+		w := &worker{store: mock, batchSize: 10, logger: logger}
 		w.sweep()
 
 		// Because one notifier failed, the aggregate error should have prevented
@@ -227,10 +227,10 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 			},
 		}
 
-		w := &Worker{
-			Store:     mock,
-			BatchSize: 10,
-			Logger:    logger,
+		w := &worker{
+			store:     mock,
+			batchSize: 10,
+			logger:    logger,
 		}
 
 		w.sweep()
@@ -251,8 +251,8 @@ func TestWorker_Sweep_NotifierFaultTolerance(t *testing.T) {
 }
 
 func TestSendWebPush_ReturnsNilWhenSubscriptionIsNil(t *testing.T) {
-	w := &Worker{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	w := &worker{
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
 	t.Run("returns nil when PushSubscription is nil", func(t *testing.T) {

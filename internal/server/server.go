@@ -30,7 +30,7 @@ import (
 
 const (
 	defaultLogLevel        = "info"
-	defaultWorkerInterval  = 5 * time.Minute
+	defaultWorkerInterval  = 1 * time.Minute
 	defaultWorkerBatchSize = 1000
 )
 
@@ -52,8 +52,8 @@ type Server struct {
 	mux            http.Handler
 	logger         *slog.Logger
 	middlewares    []func(http.Handler) http.Handler
-	VAPIDPublicKey string
-	Worker         *Worker
+	vapidPublicKey string
+	worker         *worker
 }
 
 // Config holds configuration for creating a Server.
@@ -147,7 +147,7 @@ func New(cfg *Config) (*Server, error) {
 	}
 
 	// Server serves the key
-	server.VAPIDPublicKey = pub
+	server.vapidPublicKey = pub
 
 	// Demo mode
 	if server.DemoMode {
@@ -158,18 +158,18 @@ func New(cfg *Config) (*Server, error) {
 	}
 
 	// Worker
-	server.Worker = &Worker{
-		Store:           db,
-		Interval:        server.WorkerInterval,
-		BatchSize:       server.WorkerBatchSize,
-		Logger:          server.logger,
-		SubscriberEmail: server.ContactEmail,
-		// Worker validates the sub claim
-		VAPIDPublicKey: server.VAPIDPublicKey,
-		// Worker signs the push
-		VAPIDPrivateKey: priv,
+	server.worker = &worker{
+		store:           db,
+		interval:        server.WorkerInterval,
+		batchSize:       server.WorkerBatchSize,
+		logger:          server.logger,
+		subscriberEmail: server.ContactEmail,
+		// worker validates the sub claim
+		vapidPublicKey: server.vapidPublicKey,
+		// worker signs the push
+		vapidPrivateKey: priv,
 	}
-	go server.Worker.Start(server.ctx)
+	go server.worker.start(server.ctx)
 
 	// Features
 	if server.Metrics {
@@ -273,7 +273,7 @@ func New(cfg *Config) (*Server, error) {
 			r.Get("/vapid", func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/plain")
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(server.VAPIDPublicKey))
+				_, _ = w.Write([]byte(server.vapidPublicKey))
 			})
 		})
 	})
@@ -303,7 +303,6 @@ func (s *Server) Start() error {
 
 	// Auto TLS will create listeners on port 80 and 443
 	if s.AutoTLS {
-		s.printBanner(":80, :443")
 		log.Info("Starting server on :80 and :443")
 		certmagic.DefaultACME.Agreed = true
 		certmagic.DefaultACME.Email = s.ContactEmail
@@ -322,7 +321,6 @@ func (s *Server) Start() error {
 		IdleTimeout:       5 * time.Second,
 	}
 
-	s.printBanner(addr)
 	log.Info("Starting server on " + addr)
 
 	// If custom cert and key provided, listen on specified server port via https

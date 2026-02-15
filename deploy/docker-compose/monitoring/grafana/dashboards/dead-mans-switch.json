@@ -395,7 +395,7 @@
           "refId": "A"
         }
       ],
-      "title": "Go REST Template non HTTP logs",
+      "title": "Dead Man's Switch non HTTP logs",
       "type": "logs"
     },
     {
@@ -433,7 +433,7 @@
           "refId": "A"
         }
       ],
-      "title": "Go REST Template HTTP error logs",
+      "title": "Dead Man's Switch HTTP error logs",
       "type": "logs"
     }
   ],
@@ -485,7 +485,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Go REST Template",
+  "title": "Dead Man's Switch",
   "uid": "ee3nr22at9zb4c",
   "version": 1,
   "weekStart": ""

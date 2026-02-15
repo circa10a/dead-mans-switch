@@ -28,7 +28,17 @@ func initClient() error {
 		Timeout: 5 * time.Second,
 	}
 
-	client, err = api.NewClientWithResponses(apiURL, api.WithHTTPClient(httpClient))
+	opts := []api.ClientOption{
+		api.WithHTTPClient(httpClient),
+	}
+
+	// Attach cached bearer token if available
+	tok, loadErr := loadToken()
+	if loadErr == nil && tok != nil && tok.AccessToken != "" {
+		opts = append(opts, withBearerToken(tok.AccessToken))
+	}
+
+	client, err = api.NewClientWithResponses(apiURL, opts...)
 	return err
 }
 

@@ -24,7 +24,7 @@ json_get() {
 }
 
 # ── Wait for Authentik to become healthy ──────────────────────────────
-echo "⏳ Waiting for Authentik to become ready at ${AUTHENTIK_URL}..."
+echo "Waiting for Authentik to become ready at ${AUTHENTIK_URL}..."
 elapsed=0
 until curl -sf "${AUTHENTIK_URL}/-/health/live/" > /dev/null 2>&1; do
     if [ "$elapsed" -ge "$MAX_WAIT" ]; then
@@ -38,7 +38,7 @@ done
 echo "Authentik is ready"
 
 # Wait for the blueprint to be applied (provider must exist)
-echo "⏳ Waiting for blueprint to create the OAuth2 provider..."
+echo "Waiting for blueprint to create the OAuth2 provider..."
 elapsed=0
 until curl -sf \
     -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
@@ -70,6 +70,11 @@ fi
 
 ISSUER_URL="${AUTHENTIK_URL}/application/o/${APP_SLUG}/"
 
+# Fetch the service account credentials
+# In Authentik, M2M auth uses the app password token (not the user's login password)
+SERVICE_USERNAME="dms-service-account"
+SERVICE_PASSWORD="${DMS_SERVICE_ACCOUNT_TOKEN:-dms-bootstrap-token}"
+
 # Print results
 cat <<EOF
 
@@ -77,8 +82,9 @@ cat <<EOF
   Authentik OAuth2 Configuration
 ═══════════════════════════════════════════════════════════════
   Client ID:     ${CLIENT_ID}
-  Client Secret: ${CLIENT_SECRET}
   Issuer URL:    ${ISSUER_URL}
+  Username:      ${SERVICE_USERNAME}
+  Password:      ${SERVICE_PASSWORD}
 ═══════════════════════════════════════════════════════════════
 
 Start dead-mans-switch with:
@@ -87,12 +93,13 @@ Start dead-mans-switch with:
     --auth-enabled \\
     --auth-issuer-url "${ISSUER_URL}"
 
-And get a token with:
+And login with:
 
-  curl -X POST ${AUTHENTIK_URL}/application/o/token/ \\
-    -d grant_type=client_credentials \\
-    -d client_id=${CLIENT_ID} \\
-    -d client_secret=${CLIENT_SECRET} | jq -r .access_token
+  dead-mans-switch auth login \\
+    --issuer-url "${ISSUER_URL}" \\
+    --client-id ${CLIENT_ID} \\
+    --username ${SERVICE_USERNAME} \\
+    --password ${SERVICE_PASSWORD}
 
 EOF
 
@@ -100,8 +107,9 @@ EOF
 if [ -n "${CREDENTIALS_FILE:-}" ]; then
     cat > "$CREDENTIALS_FILE" <<EOF
 CLIENT_ID=${CLIENT_ID}
-CLIENT_SECRET=${CLIENT_SECRET}
 ISSUER_URL=${ISSUER_URL}
+DMS_USERNAME=${SERVICE_USERNAME}
+DMS_PASSWORD=${SERVICE_PASSWORD}
 EOF
     echo "Credentials written to ${CREDENTIALS_FILE}"
 fi

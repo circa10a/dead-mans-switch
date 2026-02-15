@@ -192,6 +192,30 @@ func TestJWTAuth(t *testing.T) {
 			expectedBody:   "Invalid token",
 		},
 		{
+			name:    "issuer URL trailing slash normalization",
+			enabled: true,
+			header: func() string {
+				// Token issuer without trailing slash should match validator with trailing slash
+				token := jwt.NewWithClaims(jwt.SigningMethodRS256, &customClaims{
+					Sub: "user123",
+					RegisteredClaims: jwt.RegisteredClaims{
+						Issuer:    strings.TrimSuffix(issuerURL, "/"),
+						Audience:  jwt.ClaimStrings{audience},
+						ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+						IssuedAt:  jwt.NewNumericDate(time.Now()),
+					},
+				})
+				token.Header["kid"] = "test-key"
+
+				tokenString, err := token.SignedString(privateKey)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return "Bearer " + tokenString
+			}(),
+			expectedStatus: http.StatusOK,
+		},
+		{
 			name:    "missing user identifier in token",
 			enabled: true,
 			header: func() string {

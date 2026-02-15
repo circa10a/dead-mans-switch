@@ -91,7 +91,7 @@ func createDemoSwitches(store database.Store) error {
 // clearAllSwitches removes all switches from the database
 func clearAllSwitches(store database.Store) error {
 	// Get all switches
-	switches, err := store.GetAll("admin", -1)
+	switches, err := store.GetAll(database.AdminUser, -1)
 	if err != nil && err != sql.ErrNoRows {
 		return fmt.Errorf("failed to get all switches: %w", err)
 	}
@@ -99,7 +99,7 @@ func clearAllSwitches(store database.Store) error {
 	// Delete each switch
 	for _, sw := range switches {
 		if sw.Id != nil {
-			err := store.Delete("admin", *sw.Id)
+			err := store.Delete(database.AdminUser, *sw.Id)
 			if err != nil {
 				return fmt.Errorf("failed to delete switch %d: %w", *sw.Id, err)
 			}

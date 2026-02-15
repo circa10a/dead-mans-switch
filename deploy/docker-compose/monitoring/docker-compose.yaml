@@ -2,7 +2,7 @@
 services:
   dead-mans-switch:
       container_name: dead-mans-switch
-      build: ../../
+      build: ../../../
       ports:
         - 8080:8080
       command: server --log-format json --metrics --storage-dir=/data
@@ -16,13 +16,13 @@ services:
       - 3100:3100
     command: -config.file=/etc/loki/loki.yaml
     volumes:
-      - ./monitoring/loki/loki.yaml:/etc/loki/loki.yaml
+      - ./loki/loki.yaml:/etc/loki/loki.yaml
 
   promtail:
     container_name: promtail
     image: grafana/promtail:3.2.1
     volumes:
-      - ./monitoring/promtail/promtail.yaml:/etc/promtail/promtail.yaml
+      - ./promtail/promtail.yaml:/etc/promtail/promtail.yaml
       - /var/run/docker.sock:/var/run/docker.sock
     command: -config.file=/etc/promtail/promtail.yaml
 
@@ -37,7 +37,7 @@ services:
       - --storage.tsdb.retention.time=30d
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./monitoring/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
       - prometheus_data:/prometheus
     ports:
       - 9090:9090
@@ -50,9 +50,9 @@ services:
     image: grafana/grafana:11.3.0
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini
-      - ./monitoring/grafana/dashboards/:/etc/grafana/provisioning/dashboards/
-      - ./monitoring/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/dashboards/:/etc/grafana/provisioning/dashboards/
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
       - grafana_data:/var/lib/grafana
     ports:
       - 3000:3000

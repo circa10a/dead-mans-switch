@@ -1,0 +1,44 @@
+# Dead Man's Switch — example configuration file
+#
+# Copy this file to one of these locations:
+#   ./dead-mans-switch.yaml        (current working directory)
+#   ~/dead-mans-switch.yaml        (home directory)
+#
+# Or pass an explicit path:
+#   dead-mans-switch server --config /path/to/config.yaml
+#
+# Precedence (highest → lowest):
+#   1. CLI flags        (--port 9090)
+#   2. Environment vars (DEAD_MANS_SWITCH_PORT=9090)
+#   3. Config file      (this file)
+#   4. Defaults
+#
+# Keys use the same names as CLI flags (hyphens, not underscores).
+
+# --- Server ---
+port: 8080
+log-format: text        # "text" or "json"
+log-level: info         # debug, info, warn, error
+storage-dir: ./data
+metrics: false
+
+# --- Authentication (OIDC) ---
+auth-enabled: false
+# auth-issuer-url: https://auth.example.com/application/o/dead-mans-switch/
+# auth-audience: <client-id>
+
+# --- TLS ---
+auto-tls: false
+# domains:
+#   - switch.example.com
+# contact-email: admin@example.com
+# tls-certificate: /path/to/cert.pem
+# tls-key: /path/to/key.pem
+
+# --- Worker ---
+worker-interval: 1m
+worker-batch-size: 1000
+
+# --- Demo Mode ---
+demo-mode: false
+# demo-reset-interval: 1h

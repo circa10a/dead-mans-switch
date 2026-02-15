@@ -178,11 +178,21 @@
                 </div>
                 <button @click="login()"
                     class="bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-600 dark:hover:bg-indigo-500 px-8 py-3 rounded-full text-sm font-bold transition-all shadow-lg shadow-indigo-900/30 active:scale-95 flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                    </svg>
-                    Sign in with Authentik
+                    <template x-if="providerName === 'Google'">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                        </svg>
+                    </template>
+                    <template x-if="providerName !== 'Google'">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                        </svg>
+                    </template>
+                    <span x-text="'Sign in with ' + providerName"></span>
                 </button>
             </div>
         </template>
@@ -500,6 +510,7 @@
                 accessToken: null,
                 userName: '',
                 oidcConfig: null,
+                providerName: 'your provider',
                 authErrorOpen: false,
                 authErrorMessage: '',
 
@@ -553,8 +564,19 @@
                             const authConfig = await authRes.json();
                             this.authEnabled = authConfig.enabled;
                             if (this.authEnabled) {
-                                // Fetch OIDC discovery
-                                const discRes = await fetch(authConfig.issuerUrl + '.well-known/openid-configuration');
+                                // Derive provider name from issuer URL for the login button
+                                const issuerUrl = authConfig.issuerUrl || '';
+                                if (issuerUrl.includes('accounts.google.com')) {
+                                    this.providerName = 'Google';
+                                } else if (issuerUrl.includes('authentik') || issuerUrl.includes('/application/o/')) {
+                                    this.providerName = 'Authentik';
+                                } else {
+                                    // Extract hostname as a fallback label
+                                    try { this.providerName = new URL(issuerUrl).hostname; } catch { this.providerName = 'your provider'; }
+                                }
+                                // Fetch OIDC discovery (normalize trailing slash for cross-provider compatibility)
+                                const issuer = authConfig.issuerUrl.endsWith('/') ? authConfig.issuerUrl : authConfig.issuerUrl + '/';
+                                const discRes = await fetch(issuer + '.well-known/openid-configuration');
                                 if (discRes.ok) {
                                     this.oidcConfig = await discRes.json();
                                     this.oidcConfig.clientId = authConfig.audience;
@@ -929,6 +951,7 @@
                         code_challenge: challenge,
                         code_challenge_method: 'S256',
                         state: state,
+                        access_type: 'offline',
                     });
                     window.location.href = this.oidcConfig.authorization_endpoint + '?' + params.toString();
                 },
@@ -961,11 +984,17 @@
                 },
 
                 setTokens(data) {
-                    this.accessToken = data.access_token;
-                    sessionStorage.setItem('dms_access_token', data.access_token);
+                    // Prefer access_token if it's a JWT; fall back to id_token for providers
+                    // like Google whose access tokens are opaque (not JWTs)
+                    let bearerToken = data.access_token;
+                    if (!parseJwt(bearerToken) && data.id_token) {
+                        bearerToken = data.id_token;
+                    }
+                    this.accessToken = bearerToken;
+                    sessionStorage.setItem('dms_access_token', bearerToken);
                     if (data.id_token) sessionStorage.setItem('dms_id_token', data.id_token);
                     if (data.refresh_token) sessionStorage.setItem('dms_refresh_token', data.refresh_token);
-                    const claims = parseJwt(data.access_token);
+                    const claims = parseJwt(bearerToken);
                     this.userName = claims?.preferred_username || claims?.name || claims?.email || claims?.sub || '';
                     // Schedule token refresh before expiry
                     if (claims?.exp) {
@@ -1066,6 +1095,18 @@
             </button>
         </div>
     </div>
+
+    <footer class="fixed bottom-0 left-0 right-0 z-30 pointer-events-none" x-show="!authEnabled || accessToken" x-cloak>
+        <div class="text-center py-3">
+            <a href="https://github.com/circa10a/dead-mans-switch" target="_blank" rel="noopener noreferrer"
+                class="pointer-events-auto inline-flex items-center gap-1.5 text-[10px] font-medium text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                circa10a/dead-mans-switch
+            </a>
+        </div>
+    </footer>
 </body>
 
 </html>

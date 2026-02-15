@@ -11,21 +11,21 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/circa10a/dead-mans-switch/internal/server/database"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
-	UserIDKey contextKey = "user_id"
-	adminUser string     = "admin"
+	userIDKey contextKey = "user_id"
 )
 
 // GetUserIDFromContext retrieves the user ID from the request context
 func GetUserIDFromContext(r *http.Request) string {
-	userID := r.Context().Value(UserIDKey)
+	userID := r.Context().Value(userIDKey)
 	if userID != nil {
 		return userID.(string)
 	}
-	return adminUser
+	return database.AdminUser
 }
 
 // JWTValidator holds configuration for JWT validation
@@ -65,7 +65,7 @@ func JWTAuth(validator *JWTValidator) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !validator.Enabled {
 				// Auth disabled - set default user ID
-				ctx := context.WithValue(r.Context(), UserIDKey, adminUser)
+				ctx := context.WithValue(r.Context(), userIDKey, database.AdminUser)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -123,8 +123,8 @@ func JWTAuth(validator *JWTValidator) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Verify issuer
-			if claims.Issuer != validator.IssuerURL {
+			// Verify issuer (normalize trailing slashes for cross-provider compatibility)
+			if strings.TrimSuffix(claims.Issuer, "/") != strings.TrimSuffix(validator.IssuerURL, "/") {
 				http.Error(w, "Invalid issuer", http.StatusUnauthorized)
 				return
 			}
@@ -156,7 +156,7 @@ func JWTAuth(validator *JWTValidator) func(http.Handler) http.Handler {
 				http.Error(w, "No user identifier in token", http.StatusUnauthorized)
 				return
 			}
-			ctx := context.WithValue(r.Context(), UserIDKey, userID)
+			ctx := context.WithValue(r.Context(), userIDKey, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

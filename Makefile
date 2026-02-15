@@ -90,7 +90,7 @@ test: $(GEN_GO_FILE)
 
 # Lint ofc
 lint:
-	@docker run --rm -v $$PWD:/tmp/project -w /tmp/project golangci/golangci-lint golangci-lint run -v
+	golangci-lint run -v
 
 # Build docker image
 docker:
@@ -113,7 +113,8 @@ clean:
 	@rm -rf bin/ coverage.out
 
 
-MON_COMPOSE := deploy/docker-compose/docker-compose.yaml
+# Monitoring stack
+MON_COMPOSE := deploy/docker-compose/monitoring/docker-compose.yaml
 
 .PHONY: monitoring monitoring-down
 
@@ -128,8 +129,9 @@ monitoring-down:
 	@docker compose -f $(MON_COMPOSE) down
 
 
-AUTH_COMPOSE := authentik/docker-compose.yaml
-AUTH_CREDS   := authentik/dms-credentials.env
+# Authentik stack for authentication testing
+AUTH_COMPOSE := deploy/docker-compose/authentik/docker-compose.yaml
+AUTH_CREDS   := deploy/docker-compose/authentik/dms-credentials.env
 
 .PHONY: auth auth-up auth-down
 
@@ -159,9 +161,10 @@ auth: auth-up build
 # Start Authentik
 auth-up:
 	@echo "==> Starting Authentik..."
-	@docker compose -f $(AUTH_COMPOSE) up -d
+	@rm -f $(AUTH_CREDS)
+	@docker compose -f $(AUTH_COMPOSE) up -d --force-recreate
 
-# Stop Authentik
+# Stop Authentik (remove volumes so blueprints re-apply cleanly next start)
 auth-down:
 	@echo "==> Stopping Authentik..."
-	@docker compose -f $(AUTH_COMPOSE) down
+	@docker compose -f $(AUTH_COMPOSE) down -v

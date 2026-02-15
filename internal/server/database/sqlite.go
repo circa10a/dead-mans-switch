@@ -34,16 +34,16 @@ func getUserID(sw api.Switch) string {
 	if sw.UserId != nil && *sw.UserId != "" {
 		return *sw.UserId
 	}
-	return "admin"
+	return AdminUser
 }
 
-// SQLiteStore is an implementation of the Store interface for SQLite.
-type SQLiteStore struct {
+// sqliteStore is an implementation of the Store interface for SQLite.
+type sqliteStore struct {
 	db            *sql.DB
-	EncryptionKey []byte
+	encryptionKey []byte
 }
 
-// New initializes a new SQLiteStore with optional encryption support.
+// NewSQLiteStore initializes a new sqliteStore with optional encryption support.
 func NewSQLiteStore(dbPath string) (Store, error) {
 	db, err := sqliteConnect(dbPath)
 	if err != nil {
@@ -62,14 +62,14 @@ func NewSQLiteStore(dbPath string) (Store, error) {
 		return nil, errors.New("encryption key content must be more than 0 bytes")
 	}
 
-	return &SQLiteStore{
+	return &sqliteStore{
 		db:            db,
-		EncryptionKey: key,
+		encryptionKey: key,
 	}, nil
 }
 
 // Init creates the necessary database tables if they do not already exist.
-func (s *SQLiteStore) Init() error {
+func (s *sqliteStore) Init() error {
 	_, err := s.db.Exec(schema)
 	if err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
@@ -79,7 +79,7 @@ func (s *SQLiteStore) Init() error {
 }
 
 // Create inserts a new switch into the database, handling encryption if a key is present.
-func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
+func (s *sqliteStore) Create(sw api.Switch) (api.Switch, error) {
 	err := s.EncryptSwitch(&sw)
 	if err != nil {
 		return api.Switch{}, err
@@ -144,7 +144,7 @@ func (s *SQLiteStore) Create(sw api.Switch) (api.Switch, error) {
 }
 
 // GetAll returns all switch records in the database up to the provided limit, scoped to the given user.
-func (s *SQLiteStore) GetAll(userID string, limit int) ([]api.Switch, error) {
+func (s *sqliteStore) GetAll(userID string, limit int) ([]api.Switch, error) {
 	query := fmt.Sprintf("SELECT %s FROM switches WHERE user_id = ? ORDER BY id DESC LIMIT ?", switchColumns)
 
 	rows, err := s.db.Query(query, userID, limit)
@@ -158,7 +158,7 @@ func (s *SQLiteStore) GetAll(userID string, limit int) ([]api.Switch, error) {
 }
 
 // GetByID returns a single switch by its ID, scoped to the given user. Returns sql.ErrNoRows if not found.
-func (s *SQLiteStore) GetByID(userID string, id int) (api.Switch, error) {
+func (s *sqliteStore) GetByID(userID string, id int) (api.Switch, error) {
 	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE user_id = ? AND id = ?", switchColumns), userID, id)
 	if err != nil {
 		return api.Switch{}, err
@@ -179,7 +179,7 @@ func (s *SQLiteStore) GetByID(userID string, id int) (api.Switch, error) {
 }
 
 // GetExpired returns switches that have timed out and are ready for notification.
-func (s *SQLiteStore) GetExpired(limit int) ([]api.Switch, error) {
+func (s *sqliteStore) GetExpired(limit int) ([]api.Switch, error) {
 	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE status = ? AND trigger_at <= ? LIMIT ?", switchColumns), api.SwitchStatusActive, time.Now().Unix(), limit)
 	if err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func (s *SQLiteStore) GetExpired(limit int) ([]api.Switch, error) {
 }
 
 // GetEligibleReminders finds switches that are approaching expiry, but haven't been warned yet.
-func (s *SQLiteStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
+func (s *sqliteStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
 	rows, err := s.db.Query(fmt.Sprintf("SELECT %s FROM switches WHERE status = ? AND reminder_enabled = 1 AND reminder_sent = 0 LIMIT ?", switchColumns), api.SwitchStatusActive, limit)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func (s *SQLiteStore) GetEligibleReminders(limit int) ([]api.Switch, error) {
 }
 
 // Update updates an existing switch's configuration and resets its expiration timer.
-func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
+func (s *sqliteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 	err := s.EncryptSwitch(&sw)
 	if err != nil {
 		return api.Switch{}, err
@@ -297,18 +297,18 @@ func (s *SQLiteStore) Update(id int, sw api.Switch) (api.Switch, error) {
 }
 
 // Delete permanently removes a switch from the database, scoped to the given user.
-func (s *SQLiteStore) Delete(userID string, id int) error {
+func (s *sqliteStore) Delete(userID string, id int) error {
 	_, err := s.db.Exec(`DELETE FROM switches WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 
 // Close closes the connection to the SQLite database.
-func (s *SQLiteStore) Close() error {
+func (s *sqliteStore) Close() error {
 	return s.db.Close()
 }
 
 // Ping checks if the database connection is still valid.
-func (s *SQLiteStore) Ping() error {
+func (s *sqliteStore) Ping() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -316,7 +316,7 @@ func (s *SQLiteStore) Ping() error {
 }
 
 // scanSwitches is an internal helper that parses SQL rows into api.Switch structs.
-func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
+func (s *sqliteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 	switches := []api.Switch{}
 	for rows.Next() {
 		sw := api.Switch{}
@@ -404,7 +404,7 @@ func (s *SQLiteStore) scanSwitches(rows *sql.Rows) ([]api.Switch, error) {
 }
 
 // EncryptSwitch encrypts sensitive switch fields before storing
-func (s *SQLiteStore) EncryptSwitch(sw *api.Switch) error {
+func (s *sqliteStore) EncryptSwitch(sw *api.Switch) error {
 	if sw.Encrypted == nil || !*sw.Encrypted {
 		return nil
 	}
@@ -435,7 +435,7 @@ func (s *SQLiteStore) EncryptSwitch(sw *api.Switch) error {
 }
 
 // DecryptSwitch decrypts sensitive switch fields in place.
-func (s *SQLiteStore) DecryptSwitch(sw *api.Switch) error {
+func (s *sqliteStore) DecryptSwitch(sw *api.Switch) error {
 	if sw.Encrypted == nil || !*sw.Encrypted {
 		return nil
 	}
@@ -468,12 +468,12 @@ func (s *SQLiteStore) DecryptSwitch(sw *api.Switch) error {
 	return nil
 }
 
-func (s *SQLiteStore) encrypt(plaintext []byte) (string, error) {
-	if len(s.EncryptionKey) == 0 {
+func (s *sqliteStore) encrypt(plaintext []byte) (string, error) {
+	if len(s.encryptionKey) == 0 {
 		return "", fmt.Errorf("encryption key not configured")
 	}
 
-	block, err := aes.NewCipher(s.EncryptionKey)
+	block, err := aes.NewCipher(s.encryptionKey)
 	if err != nil {
 		return "", err
 	}
@@ -493,8 +493,8 @@ func (s *SQLiteStore) encrypt(plaintext []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(gcm.Seal(nonce, nonce, plaintext, nil)), nil
 }
 
-func (s *SQLiteStore) decrypt(cryptoText string) ([]byte, error) {
-	if len(s.EncryptionKey) == 0 {
+func (s *sqliteStore) decrypt(cryptoText string) ([]byte, error) {
+	if len(s.encryptionKey) == 0 {
 		return nil, fmt.Errorf("encryption key not configured")
 	}
 
@@ -503,7 +503,7 @@ func (s *SQLiteStore) decrypt(cryptoText string) ([]byte, error) {
 		return nil, err
 	}
 
-	block, err := aes.NewCipher(s.EncryptionKey)
+	block, err := aes.NewCipher(s.encryptionKey)
 	if err != nil {
 		return nil, err
 	}

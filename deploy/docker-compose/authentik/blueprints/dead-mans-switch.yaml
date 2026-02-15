@@ -11,6 +11,46 @@ metadata:
       Creates an OAuth2/OpenID Connect provider and application for Dead Man's Switch,
       plus a service account user with an API token.
 entries:
+  # Create a direct-grant authentication flow for the password grant (Resource Owner Password Credentials)
+  - model: authentik_flows.flow
+    id: dms-direct-grant
+    state: present
+    identifiers:
+      slug: dms-direct-grant
+    attrs:
+      name: Dead Man's Switch Direct Grant
+      title: Dead Man's Switch Direct Grant
+      designation: authentication
+
+  # Bind the identification stage to the direct-grant flow (order 10)
+  - model: authentik_flows.flowstagebinding
+    id: dms-direct-grant-identification
+    state: present
+    identifiers:
+      target: !KeyOf dms-direct-grant
+      stage: !Find [authentik_stages_identification.identificationstage, [name, default-authentication-identification]]
+      order: 10
+
+  # Bind the password stage to the direct-grant flow (order 20)
+  - model: authentik_flows.flowstagebinding
+    id: dms-direct-grant-password
+    state: present
+    identifiers:
+      target: !KeyOf dms-direct-grant
+      stage: !Find [authentik_stages_password.passwordstage, [name, default-authentication-password]]
+      order: 20
+
+  # Bind the user-login stage to the direct-grant flow (order 30)
+  # This stage creates the session cookie — without it, browser-based logins
+  # (PKCE authorization code flow) loop because no session is established.
+  - model: authentik_flows.flowstagebinding
+    id: dms-direct-grant-login
+    state: present
+    identifiers:
+      target: !KeyOf dms-direct-grant
+      stage: !Find [authentik_stages_user_login.userloginstage, [name, default-authentication-login]]
+      order: 30
+
   # Create the OAuth2 Provider
   - model: authentik_providers_oauth2.oauth2provider
     id: dms-provider
@@ -18,6 +58,7 @@ entries:
     identifiers:
       name: Dead Man's Switch Provider
     attrs:
+      authentication_flow: !KeyOf dms-direct-grant
       authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
       client_type: public

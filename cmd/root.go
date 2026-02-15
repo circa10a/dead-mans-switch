@@ -6,10 +6,12 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var (
+	cfgFile      string
 	project      = "dead-mans-switch"
 	envVarPrefix = "DEAD_MANS_SWITCH"
 
@@ -43,9 +45,9 @@ type flagDef struct {
 	ViperKey  string
 }
 
-// RegisterFlagTypes registers flags on the provided cobra command according
+// registerFlagTypes registers flags on the provided cobra command according
 // to the provided definitions.
-func RegisterFlagTypes(cmd *cobra.Command, defs []flagDef) {
+func registerFlagTypes(cmd *cobra.Command, defs []flagDef) {
 	for _, d := range defs {
 		switch d.Type {
 		case "bool":
@@ -71,6 +73,28 @@ func Execute() {
 	}
 }
 
+// initConfig reads in the config file if set, or looks in default locations.
+func initConfig() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		home, _ := os.UserHomeDir()
+		if home != "" {
+			viper.AddConfigPath(home)
+		}
+		viper.AddConfigPath(".")
+		viper.SetConfigName("dead-mans-switch")
+		viper.SetConfigType("yaml")
+	}
+
+	// Silently ignore missing config file; flags and env vars still work.
+	_ = viper.ReadInConfig()
+}
+
 func init() {
+	cobra.OnInitialize(initConfig)
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file (default: ./dead-mans-switch.yaml or ~/dead-mans-switch.yaml)")
+
 	rootCmd.AddCommand(versionCmd)
 }

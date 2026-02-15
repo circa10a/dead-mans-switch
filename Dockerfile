@@ -35,12 +35,15 @@ RUN --mount=type=cache,target=/go/pkg/mod/ \
     "$USER" && \
     chown "$UID":"$GID" /go/src/app/dead-mans-switch && \
     mkdir /cache && \
-    chown -R "$UID":"$GID" /cache
+    chown -R "$UID":"$GID" /cache && \
+    mkdir /data && \
+    chown -R "$UID":"$GID" /data
 
 FROM scratch
 COPY --from=0 /etc/passwd /etc/passwd
 COPY --from=0 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=0 --chown=1000:1000 /cache /cache
+COPY --from=0 --chown=1000:1000 /data /data
 COPY --from=0 /go/src/app/dead-mans-switch /
 VOLUME /cache
 # Persist certs from certmagic
