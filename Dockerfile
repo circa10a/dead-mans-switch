@@ -55,4 +55,4 @@ EXPOSE 8080/tcp
 EXPOSE 80/tcp
 EXPOSE 443/tcp
 ENTRYPOINT ["/dead-mans-switch"]
-CMD ["server", "--storage-dir", "/data"]
+CMD ["server", "--data-dir", "/data"]

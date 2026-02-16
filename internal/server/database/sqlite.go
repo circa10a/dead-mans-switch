@@ -68,6 +68,38 @@ func NewSQLiteStore(dbPath string) (Store, error) {
 	}, nil
 }
 
+// NewInMemorySQLiteStore initializes an in-memory SQLite store suitable for demo mode.
+// No data is persisted to disk and a random encryption key is generated.
+func NewInMemorySQLiteStore() (Store, error) {
+	params := url.Values{}
+	params.Add("_pragma", "journal_mode=WAL")
+	params.Add("_pragma", "synchronous=NORMAL")
+
+	db, err := sql.Open("sqlite", fmt.Sprintf(":memory:?%s", params.Encode()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open in-memory database: %w", err)
+	}
+
+	db.SetMaxOpenConns(1)
+
+	err = db.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("failed to ping in-memory database: %w", err)
+	}
+
+	// Generate a random 32-byte encryption key
+	key := make([]byte, 32)
+	_, err = io.ReadFull(rand.Reader, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
+	}
+
+	return &sqliteStore{
+		db:            db,
+		encryptionKey: key,
+	}, nil
+}
+
 // Init creates the necessary database tables if they do not already exist.
 func (s *sqliteStore) Init() error {
 	_, err := s.db.Exec(schema)

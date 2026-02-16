@@ -2,14 +2,18 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/circa10a/dead-mans-switch/api"
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
 )
+
+const demoHealthCheckInterval = 5 * time.Minute
 
 var demoSwitches = []struct {
 	CheckInInterval string
@@ -28,7 +32,7 @@ var demoSwitches = []struct {
 		Notifiers:       []string{"logger://"},
 	},
 	{
-		CheckInInterval: "1s",
+		CheckInInterval: "30s",
 		Message:         "Failed notification",
 		Notifiers:       []string{"generic://test"},
 	},
@@ -55,6 +59,11 @@ func (s *Server) initDemoMode(store database.Store) error {
 	// Start periodic reset goroutine
 	if s.DemoResetInterval > 0 {
 		go periodicDemoReset(s.ctx, s.logger, store, s.DemoResetInterval)
+	}
+
+	// Start periodic health check pinger for each domain
+	if len(s.Domains) > 0 {
+		go periodicHealthPing(s.ctx, s.logger, s.Domains)
 	}
 
 	return nil
@@ -141,4 +150,48 @@ func periodicDemoReset(ctx context.Context, logger *slog.Logger, store database.
 // Helper function for creating pointers to api types
 func ptrSwitchStatus(s api.SwitchStatus) *api.SwitchStatus {
 	return &s
+}
+
+// periodicHealthPing sends GET requests to https://<domain>/v1/health every 5 minutes
+// for each configured domain to keep the demo instance alive.
+func periodicHealthPing(ctx context.Context, logger *slog.Logger, domains []string) {
+	log := logger.With("component", "demo-health-ping")
+	ticker := time.NewTicker(demoHealthCheckInterval)
+	defer ticker.Stop()
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+			},
+		},
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("health ping goroutine stopped")
+			return
+		case <-ticker.C:
+			for _, domain := range domains {
+				url := fmt.Sprintf("https://%s/v1/health", domain)
+
+				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+				if err != nil {
+					log.Error("failed to create health ping request", "domain", domain, "error", err)
+					continue
+				}
+
+				resp, err := client.Do(req)
+				if err != nil {
+					log.Error("health ping failed", "domain", domain, "error", err)
+					continue
+				}
+				resp.Body.Close()
+
+				log.Debug("health ping completed", "domain", domain, "status", resp.StatusCode)
+			}
+		}
+	}
 }

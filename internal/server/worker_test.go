@@ -285,3 +285,46 @@ func TestSendWebPush_ReturnsNilWhenSubscriptionIsNil(t *testing.T) {
 func ptr[T any](v T) *T {
 	return &v
 }
+
+func TestCapitalizeFirst(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "lowercase string",
+			input:    "failed to send notification",
+			expected: "Failed to send notification",
+		},
+		{
+			name:     "already capitalized",
+			input:    "Already capitalized",
+			expected: "Already capitalized",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "single character",
+			input:    "a",
+			expected: "A",
+		},
+		{
+			name:     "all uppercase",
+			input:    "ALL CAPS",
+			expected: "ALL CAPS",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := capitalizeFirst(tt.input)
+			if result != tt.expected {
+				t.Errorf("expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}

@@ -27,7 +27,7 @@ spec:
       containers:
       - name: dead-mans-switch
         image: circa10a/dead-mans-switch
-        args: ["server", "--storage-dir", "/data", "--port", "8080"]
+        args: ["server", "--data-dir", "/data", "--port", "8080"]
         ports:
         - containerPort: 8080
         volumeMounts:

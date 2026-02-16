@@ -31,7 +31,7 @@ const (
 	logLevelKey           = "log-level"
 	metricsKey            = "metrics"
 	portKey               = "port"
-	storageDirKey         = "storage-dir"
+	dataDirKey            = "data-dir"
 	tlsCertificateKey     = "tls-certificate"
 	tlsKeyKey             = "tls-key"
 	workerBatchSizeKey    = "worker-batch-size"
@@ -57,7 +57,7 @@ var serverCmd = &cobra.Command{
 			LogLevel:          viper.GetString(logLevelKey),
 			Metrics:           viper.GetBool(metricsKey),
 			Port:              viper.GetInt(portKey),
-			StorageDir:        viper.GetString(storageDirKey),
+			DataDir:           viper.GetString(dataDirKey),
 			TLSCert:           viper.GetString(tlsCertificateKey),
 			TLSKey:            viper.GetString(tlsKeyKey),
 			Validation:        true,
@@ -103,7 +103,7 @@ func init() {
 		{Name: logLevelKey, Shorthand: "l", Type: "string", Default: "info", Usage: "Server logging level.", ViperKey: logLevelKey},
 		{Name: metricsKey, Shorthand: "m", Type: "bool", Default: false, Usage: "Enable Prometheus metrics instrumentation.", ViperKey: metricsKey},
 		{Name: portKey, Shorthand: "p", Type: "int", Default: 8080, Usage: "Port to listen on. Cannot be used in conjunction with --auto-tls since that will require listening on 80 and 443.", ViperKey: portKey},
-		{Name: storageDirKey, Shorthand: "s", Type: "string", Default: "./data", Usage: "Storage directory for database", ViperKey: storageDirKey},
+		{Name: dataDirKey, Shorthand: "s", Type: "string", Default: "./data", Usage: "Data directory for database and keys", ViperKey: dataDirKey},
 		{Name: tlsCertificateKey, Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS certificate. Cannot be used with --auto-tls.", ViperKey: tlsCertificateKey},
 		{Name: tlsKeyKey, Shorthand: "", Type: "string", Default: "", Usage: "Path to custom TLS key. Cannot be used with --auto-tls.", ViperKey: tlsKeyKey},
 		{Name: workerBatchSizeKey, Shorthand: "", Type: "int", Default: 1000, Usage: "How many notification records to process at a time.", ViperKey: workerBatchSizeKey},

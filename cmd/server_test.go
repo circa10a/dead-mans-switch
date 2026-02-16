@@ -85,7 +85,7 @@ func TestServerSignalExit(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "dms-test")
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	viper.Set(storageDirKey, tmpDir)
+	viper.Set(dataDirKey, tmpDir)
 	viper.Set(portKey, 0) // Port 0 lets OS pick a free port
 
 	errChan := make(chan error, 1)

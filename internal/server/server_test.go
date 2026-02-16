@@ -135,7 +135,7 @@ func TestServerConfigOpts(t *testing.T) {
 		cfg := &Config{
 			AutoTLS:    v,
 			Domains:    []string{"d"},
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -153,7 +153,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := true
 		cfg := &Config{
 			DemoMode:   v,
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -171,7 +171,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := 10 * time.Second
 		cfg := &Config{
 			DemoResetInterval: v,
-			StorageDir:        tmpDir,
+			DataDir:        tmpDir,
 			Validation:        false,
 		}
 
@@ -189,7 +189,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := []string{"lemon"}
 		cfg := &Config{
 			Domains:    v,
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 		}
 
 		s, err := New(cfg)
@@ -207,7 +207,7 @@ func TestServerConfigOpts(t *testing.T) {
 			func(h http.Handler) http.Handler { return nil },
 		}
 		cfg := &Config{
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 		}
 
 		s, err := New(cfg)
@@ -225,7 +225,7 @@ func TestServerConfigOpts(t *testing.T) {
 	t.Run("TLSCert", func(t *testing.T) {
 		v := "cert"
 		cfg := &Config{
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			TLSCert:    v,
 			Validation: false,
 		}
@@ -243,7 +243,7 @@ func TestServerConfigOpts(t *testing.T) {
 	t.Run("TLSKey", func(t *testing.T) {
 		v := "key"
 		cfg := &Config{
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			TLSKey:     v,
 			Validation: false,
 		}
@@ -264,7 +264,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := 3000
 		cfg := &Config{
 			Port:       v,
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -283,7 +283,7 @@ func TestServerConfigOpts(t *testing.T) {
 		cfg := &Config{
 			AutoTLS:    v,
 			Domains:    []string{"d"},
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -301,7 +301,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := true
 		cfg := &Config{
 			Metrics:    v,
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -320,7 +320,7 @@ func TestServerConfigOpts(t *testing.T) {
 		vlower := strings.ToLower(v)
 		cfg := &Config{
 			LogFormat:  v,
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -338,7 +338,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := "DEBUG"
 		cfg := &Config{
 			LogLevel:   v,
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -352,10 +352,10 @@ func TestServerConfigOpts(t *testing.T) {
 		}
 	})
 
-	t.Run("StorageDir", func(t *testing.T) {
+	t.Run("DataDir", func(t *testing.T) {
 		v := tmpDir
 		cfg := &Config{
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: false,
 		}
 
@@ -364,7 +364,7 @@ func TestServerConfigOpts(t *testing.T) {
 			t.Errorf("received unexpected err: %s", err.Error())
 		}
 
-		if s.StorageDir != v {
+		if s.DataDir != v {
 			t.Errorf(outputStr, s.LogLevel, v)
 		}
 	})
@@ -373,7 +373,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := 500
 		cfg := &Config{
 			WorkerBatchSize: v,
-			StorageDir:      tmpDir,
+			DataDir:      tmpDir,
 			Validation:      false,
 		}
 
@@ -391,7 +391,7 @@ func TestServerConfigOpts(t *testing.T) {
 		v := 1 * time.Second
 		cfg := &Config{
 			WorkerInterval: v,
-			StorageDir:     tmpDir,
+			DataDir:     tmpDir,
 			Validation:     false,
 		}
 
@@ -408,7 +408,7 @@ func TestServerConfigOpts(t *testing.T) {
 	t.Run("Validation", func(t *testing.T) {
 		v := true
 		cfg := &Config{
-			StorageDir: tmpDir,
+			DataDir: tmpDir,
 			Validation: v,
 		}
 

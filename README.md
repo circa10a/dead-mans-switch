@@ -5,12 +5,15 @@
 ![Build Status](https://github.com/circa10a/dead-mans-switch/workflows/deploy/badge.svg)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/circa10a/dead-mans-switch)
 
-<img width="45%" height="45%" src="docs/images/grim_gopher.png" align="right"/>
+<img width="35%" height="35%" src="docs/images/grim_gopher.png" align="right"/>
 
 ## Table of Contents
 
+### Try out a [demo version here](https://deadmanswitch.shop/) 👈
+
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [Install as a PWA](#install-as-a-pwa)
 - [Configuration](#configuration)
 - [Guides](#guides)
 - [CLI Reference](#cli-reference)
@@ -34,28 +37,35 @@ I have several personal use cases for this so I made this to run for myself. May
 
 ### Demo
 
-Try the live demo at [insert demo URL here]
+<div align="center">
+  <a href="https://www.youtube.com/shorts/TZpzKno5kCI">
+    <img src="https://img.youtube.com/vi/TZpzKno5kCI/0.jpg" alt="Dead Man's Switch Mobile Demo" width="300"/>
+  </a>
+  <p><em>Mobile App view — creating a switch, checking in, and receiving push notifications</em></p>
+</div>
 
 ### Deploy
 
 ```bash
 # Start the server with default settings (HTTP)
 # http://localhost:8080
-docker run -v -p 8080:8080 $PWD/dead-mans-switch-data:/data circa10a/dead-mans-switch
+docker run -v $PWD/dead-mans-switch-data:/data -p 8080:8080 circa10a/dead-mans-switch
 
 # Start with HTTPS (Let's Encrypt for automatic TLS)
 # Requires domain pointing to host address
 # http://myexamplesite.com
-docker run -v -p 443:443 80:80 $PWD/dead-mans-switch-data:/data circa10a/dead-mans-switch \
+docker run -v $PWD/dead-mans-switch-data:/data -p 443:443 -p 80:80 circa10a/dead-mans-switch \
+  server \
   --auto-tls \
   --domains myexamplesite.com \
-  --storage-dir /data
+  --data-dir /data
 
 # Start with HTTPS (Custom Certs)
-docker run -v -p 8443:8443 $PWD/certs:/certs $PWD/dead-mans-switch-data:/data circa10a/dead-mans-switch server \
+docker run -v $PWD/certs:/certs $PWD/dead-mans-switch-data:/data -p 8443:8443 circa10a/dead-mans-switch \
+  server
   --auto-tls \
   --domains myexamplesite.com \
-  --storage-dir /data \
+  --data-dir /data \
   --tls-certificate /certs/cert.pem \
   --tls-key /certs/key.pem
 ```
@@ -64,7 +74,34 @@ docker run -v -p 8443:8443 $PWD/certs:/certs $PWD/dead-mans-switch-data:/data ci
 > HTTPS is required for push notifications.
 
 > [!CAUTION]
-> The `--storage-dir` directory contains your database and VAPID keys. Deleting or losing this directory will permanently destroy all switches and break existing push notification subscriptions. **Back it up.**
+> The `--data-dir` directory contains your database and VAPID keys. Deleting or losing this directory will permanently destroy all switches and break existing push notification subscriptions. **Back it up.**
+
+## Install as a PWA
+
+Dead Man's Switch can be installed as a Progressive Web App (PWA) for a native app-like experience on your phone or desktop.
+
+### iOS (Safari)
+
+1. Open your Dead Man's Switch instance in **Safari**
+2. Tap the **Share** button (square with an arrow)
+3. Scroll down and tap **Add to Home Screen**
+4. Tap **Add**
+
+### Android (Chrome)
+
+1. Open your Dead Man's Switch instance in **Chrome**
+2. Tap the **three-dot menu** (⋮)
+3. Tap **Add to Home Screen** (or **Install app**)
+4. Tap **Install**
+
+### Desktop (Chrome / Edge)
+
+1. Open your Dead Man's Switch instance in **Chrome** or **Edge**
+2. Click the **install icon** (⊕) in the address bar, or go to **Menu -> Install Dead Man's Switch**
+3. Click **Install**
+
+> [!NOTE]
+> HTTPS is required for PWA installation. Use `--auto-tls` or provide custom certificates.
 
 ## Configuration
 
@@ -86,7 +123,7 @@ Example config (see [`dead-mans-switch.example.yaml`](dead-mans-switch.example.y
 port: 8080
 log-level: info
 log-format: json
-storage-dir: ./data
+data-dir: ./data
 metrics: true
 
 auth-enabled: true
@@ -168,7 +205,7 @@ Flags:
   -l, --log-level string               Server logging level. (env: DEAD_MANS_SWITCH_LOG_LEVEL) (default "info")
   -m, --metrics                        Enable Prometheus metrics instrumentation. (env: DEAD_MANS_SWITCH_METRICS)
   -p, --port int                       Port to listen on. Cannot be used in conjunction with --auto-tls since that will require listening on 80 and 443. (env: DEAD_MANS_SWITCH_PORT) (default 8080)
-  -s, --storage-dir string             Storage directory for database (env: DEAD_MANS_SWITCH_STORAGE_DIR) (default "./data")
+  -s, --data-dir string               Data directory for database and keys (env: DEAD_MANS_SWITCH_DATA_DIR) (default "./data")
       --tls-certificate string         Path to custom TLS certificate. Cannot be used with --auto-tls. (env: DEAD_MANS_SWITCH_TLS_CERTIFICATE)
       --tls-key string                 Path to custom TLS key. Cannot be used with --auto-tls. (env: DEAD_MANS_SWITCH_TLS_KEY)
       --worker-batch-size int          How many notification records to process at a time. (env: DEAD_MANS_SWITCH_WORKER_BATCH_SIZE) (default 1000)
@@ -248,7 +285,7 @@ make auth-down
 ### Run local Prometheus/Grafana/Loki stack
 
 ```console
-$ make monitoring
+make monitoring
 ````
 
 ## License

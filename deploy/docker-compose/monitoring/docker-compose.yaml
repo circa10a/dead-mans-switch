@@ -5,7 +5,7 @@ services:
       build: ../../../
       ports:
         - 8080:8080
-      command: server --log-format json --metrics --storage-dir=/data
+      command: server --log-format json --metrics --data-dir=/data
       volumes:
       - dms_data:/data
 

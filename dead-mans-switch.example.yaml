@@ -19,7 +19,7 @@
 port: 8080
 log-format: text        # "text" or "json"
 log-level: info         # debug, info, warn, error
-storage-dir: ./data
+data-dir: ./data
 metrics: false
 
 # --- Authentication (OIDC) ---

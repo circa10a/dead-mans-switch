@@ -798,9 +798,9 @@
                     this.resettingId = id;
                     if ("vibrate" in navigator) navigator.vibrate([40, 40, 40]);
 
-                    const currentSub = await this.getSubscription();
-
                     try {
+                        const currentSub = await this.getSubscription();
+
                         const response = await fetch(`${this.baseUrl}/switch/${id}/reset`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
@@ -820,7 +820,12 @@
                 async saveSw() {
                     const notifiers = this.form.notifiersStr.split('\n').filter(s => s.trim());
 
-                    const currentSub = await this.getSubscription();
+                    let currentSub = null;
+                    try {
+                        currentSub = await this.getSubscription();
+                    } catch (e) {
+                        console.error("Failed to get subscription for save:", e);
+                    }
 
                     const payload = {
                         ...this.form,
@@ -899,17 +904,21 @@
                 },
 
                 async getSubscription() {
-                    if (this.isSecure && 'serviceWorker' in navigator && Notification.permission === 'granted') {
+                    if (this.isSecure && 'serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
                         try {
-                            const reg = await navigator.serviceWorker.ready;
-                            let sub = await reg.pushManager.getSubscription();
-                            if (!sub && this.vapidPublicKey) {
-                                sub = await reg.pushManager.subscribe({
-                                    userVisibleOnly: true,
-                                    applicationServerKey: Uint8Array.from(atob(this.vapidPublicKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
-                                });
-                            }
-                            return sub;
+                            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('SW timeout')), 3000));
+                            const getSub = async () => {
+                                const reg = await navigator.serviceWorker.ready;
+                                let sub = await reg.pushManager.getSubscription();
+                                if (!sub && this.vapidPublicKey) {
+                                    sub = await reg.pushManager.subscribe({
+                                        userVisibleOnly: true,
+                                        applicationServerKey: Uint8Array.from(atob(this.vapidPublicKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+                                    });
+                                }
+                                return sub;
+                            };
+                            return await Promise.race([getSub(), timeout]);
                         } catch (e) {
                             console.error("Failed to get subscription:", e);
                         }

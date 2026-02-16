@@ -87,8 +87,12 @@ func initConfig() {
 		viper.SetConfigType("yaml")
 	}
 
-	// Silently ignore missing config file; flags and env vars still work.
-	_ = viper.ReadInConfig()
+	// When --config is explicitly set, the file must exist.
+	// Otherwise, silently ignore missing config; flags and env vars still work.
+	if err := viper.ReadInConfig(); err != nil && cfgFile != "" {
+		fmt.Fprintf(os.Stderr, "Error: failed to read config file: %s\n", err)
+		os.Exit(1)
+	}
 }
 
 func init() {

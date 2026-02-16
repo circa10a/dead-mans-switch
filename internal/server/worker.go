@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/circa10a/dead-mans-switch/api"
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
 	"github.com/nicholas-fedor/shoutrrr"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 // worker periodically processes expired switches and sends notifications.
@@ -96,7 +95,7 @@ func (w *worker) processExpiredSwitch(sw api.Switch) error {
 		if sw.Status == nil || *sw.Status != api.SwitchStatusFailed {
 			statusFailed := api.SwitchStatusFailed
 			sw.Status = &statusFailed
-			failureMsg := cases.Title(language.English).String(sendErr.Error())
+			failureMsg := capitalizeFirst(sendErr.Error())
 			sw.FailureReason = &failureMsg
 
 			_, err := w.store.Update(*sw.Id, sw)
@@ -288,4 +287,12 @@ func (w *worker) sendWebPush(sw api.Switch, title, body string) error {
 	w.logger.Debug("Web push sent", "id", *sw.Id, "status_code", resp.StatusCode)
 
 	return nil
+}
+
+// capitalizeFirst uppercases the first character of a string.
+func capitalizeFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

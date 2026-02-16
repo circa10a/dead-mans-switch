@@ -96,7 +96,7 @@ type Config struct {
 	ContactEmail      string
 	DemoMode          bool
 	Port              int
-	StorageDir        string
+	DataDir           string
 	Validation        bool
 }
 ```

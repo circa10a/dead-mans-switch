@@ -58,7 +58,12 @@ func SwitchValidator(v *validator.Validate) func(http.Handler) http.Handler {
 
 			checkInIntervalDuration, err := time.ParseDuration(payload.CheckInInterval)
 			if err != nil {
-				sendJSONError(w, http.StatusBadRequest, "Invalid checkInInterval time format. Examples are 10s, 10m, 10h, 10d")
+				sendJSONError(w, http.StatusBadRequest, "Invalid checkInInterval time format. Examples are 30s, 60m, 48h")
+				return
+			}
+
+			if checkInIntervalDuration <= 0 {
+				sendJSONError(w, http.StatusBadRequest, "checkInInterval must be a positive duration (e.g., 30s, 60m, 48h)")
 				return
 			}
 

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,7 +71,7 @@ type Config struct {
 	LogLevel          string
 	Metrics           bool
 	Port              int
-	StorageDir        string
+	DataDir           string
 	TLSCert           string
 	TLSKey            string
 	Validation        bool
@@ -100,6 +101,18 @@ func New(cfg *Config) (*Server, error) {
 		server.WorkerInterval = defaultWorkerInterval
 	}
 
+	// In demo mode, allow the PORT env var to override the configured port
+	// to support PaaS platforms like Render that assign a dynamic port.
+	if server.DemoMode {
+		if portStr, ok := os.LookupEnv("PORT"); ok {
+			p, err := strconv.Atoi(portStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid PORT value %q: %w", portStr, err)
+			}
+			server.Port = p
+		}
+	}
+
 	server.LogFormat = strings.ToLower(server.LogFormat)
 
 	router := chi.NewRouter()
@@ -127,9 +140,17 @@ func New(cfg *Config) (*Server, error) {
 	server.logger = slog.New(logHandler)
 
 	// Database
-	db, err := database.NewSQLiteStore(server.StorageDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	var db database.Store
+	if server.DemoMode {
+		db, err = database.NewInMemorySQLiteStore()
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize in-memory database: %w", err)
+		}
+	} else {
+		db, err = database.NewSQLiteStore(server.DataDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize database: %w", err)
+		}
 	}
 
 	err = db.Init()
@@ -138,8 +159,8 @@ func New(cfg *Config) (*Server, error) {
 	}
 
 	// Create VAPID keys for push notifications
-	vapidPrivPath := filepath.Join(server.StorageDir, "vapid.priv")
-	vapidPubPath := filepath.Join(server.StorageDir, "vapid.pub")
+	vapidPrivPath := filepath.Join(server.DataDir, "vapid.priv")
+	vapidPubPath := filepath.Join(server.DataDir, "vapid.pub")
 
 	priv, pub, err := secrets.LoadOrCreateVAPIDKeys(vapidPrivPath, vapidPubPath)
 	if err != nil {
