@@ -12,90 +12,125 @@ import (
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
+		name      string
 		server    *Server
 		expectErr bool
 	}{
 		{
-			// Invalid log format
+			name: "invalid log format",
 			server: &Server{
 				Config: Config{
-					LogFormat: "fake",
+					Validation: true,
+					LogFormat:  "fake",
 				},
 			},
 			expectErr: true,
 		},
 		{
-			// Auto TLS and custom cert set (conflict)
+			name: "AutoTLS and custom cert set conflict",
 			server: &Server{
 				Config: Config{
-					AutoTLS: true,
-					TLSCert: "cert",
+					Validation: true,
+					AutoTLS:    true,
+					TLSCert:    "cert",
 				},
 			},
 			expectErr: true,
 		},
 		{
-			// Auto TLS and custom key set (conflict)
+			name: "AutoTLS and custom key set conflict",
 			server: &Server{
 				Config: Config{
-					AutoTLS: true,
-					TLSKey:  "key",
+					Validation: true,
+					AutoTLS:    true,
+					TLSKey:     "key",
 				},
 			},
 			expectErr: true,
 		},
 		{
-			// Auto TLS and no domains
+			name: "AutoTLS and no domains",
 			server: &Server{
 				Config: Config{
-					AutoTLS: true,
+					Validation: true,
+					AutoTLS:    true,
 				},
 			},
 			expectErr: true,
 		},
 		{
-			// Cert set without key
+			name: "cert set without key",
 			server: &Server{
 				Config: Config{
-					TLSCert: "cert",
+					Validation: true,
+					TLSCert:    "cert",
 				},
 			},
 			expectErr: true,
 		},
 		{
-			// Key set without cert
+			name: "key set without cert",
 			server: &Server{
 				Config: Config{
-					TLSKey: "key",
+					Validation: true,
+					TLSKey:     "key",
 				},
 			},
 			expectErr: true,
 		},
 		{
-			// Valid AutoTLS config
+			name: "valid AutoTLS config",
 			server: &Server{
 				Config: Config{
-					AutoTLS: true,
-					Domains: []string{"domain"},
+					Validation: true,
+					AutoTLS:    true,
+					Domains:    []string{"domain"},
 				},
 			},
 		},
 		{
-			// Valid custom cert/key config
+			name: "valid custom cert and key config",
 			server: &Server{
 				Config: Config{
-					TLSCert: "cert",
-					TLSKey:  "key",
+					Validation: true,
+					TLSCert:    "cert",
+					TLSKey:     "key",
 				},
 			},
+		},
+		{
+			name: "invalid log level",
+			server: &Server{
+				Config: Config{
+					Validation: true,
+					LogLevel:   "invalid",
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name: "validation disabled skips all checks",
+			server: &Server{
+				Config: Config{
+					Validation: false,
+					LogFormat:  "fake",
+					AutoTLS:    true,
+				},
+			},
+			expectErr: false,
 		},
 	}
 
-	for _, test := range tests {
-		err := test.server.validate()
-		if err != nil && !test.expectErr {
-			t.Errorf("unexpected validation result: got error=%v wantErr=%v, err=%v", err != nil, test.expectErr, err)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.server.validate()
+			if err != nil && !tt.expectErr {
+				t.Errorf("unexpected validation result: got error=%v wantErr=%v, err=%v", err != nil, tt.expectErr, err)
+			}
+			if err == nil && tt.expectErr {
+				t.Error("expected error but got nil")
+			}
+		})
 	}
 }
 
