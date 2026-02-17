@@ -27,7 +27,7 @@ Do not introduce alternatives to these without discussion:
 | `spf13/cobra` + `spf13/viper` | CLI + config (env vars use `DEAD_MANS_SWITCH_` prefix) |
 | `charmbracelet/log` | slog handler (text/JSON output) |
 | `modernc.org/sqlite` | Pure-Go SQLite (no CGO) |
-| `nicholas-fedor/shoutrrr` | Multi-provider notifications |
+| `circa10a/shoutrrr` | Multi-provider notifications |
 | `go-playground/validator` | Request body validation |
 
 ## Generated Code
@@ -76,7 +76,6 @@ All code introduced should pass `golangci-lint run -v` without error. Should err
 ## Code Review Checklist
 
 When creating new features, ensure:
-- [ ] Error handling follows the next-line rule with `%w` wrapping
 - [ ] Unit tests exist for all code paths (happy path, error cases, edge cases)
 - [ ] Standard library `t.Error()`, `t.Errorf()`, and `t.Fatal()` used for assertions
 - [ ] Config struct fields and flag definitions are alphabetically sorted
@@ -111,23 +110,6 @@ type Config struct {
 ```
 
 ### Error Handling
-
-**Rule**: Error handling conditions must always be placed on the next line after a statement that produces an error.
-
-**Good**:
-```go
-result, err := someFunction()
-if err != nil {
-    return fmt.Errorf("failed to do something: %w", err)
-}
-```
-
-**Bad**:
-```go
-result, err := someFunction(); if err != nil {
-    return fmt.Errorf("failed to do something: %w", err)
-}
-```
 
 **Error wrapping**: Always use `%w` when wrapping an existing `error` value. Only use `%v` or `%s` when constructing a new error from non-error data.
 

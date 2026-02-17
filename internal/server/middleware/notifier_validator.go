@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/circa10a/dead-mans-switch/api"
-	"github.com/nicholas-fedor/shoutrrr/pkg/router"
+	"github.com/circa10a/shoutrrr/pkg/router"
 )
 
 // NotifierValidator validates the Shoutrrr URL in the notifier field for POST requests

@@ -89,7 +89,8 @@ func initConfig() {
 
 	// When --config is explicitly set, the file must exist.
 	// Otherwise, silently ignore missing config; flags and env vars still work.
-	if err := viper.ReadInConfig(); err != nil && cfgFile != "" {
+	err := viper.ReadInConfig()
+	if err != nil && cfgFile != "" {
 		fmt.Fprintf(os.Stderr, "Error: failed to read config file: %s\n", err)
 		os.Exit(1)
 	}

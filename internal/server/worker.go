@@ -13,7 +13,7 @@ import (
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/circa10a/dead-mans-switch/api"
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
-	"github.com/nicholas-fedor/shoutrrr"
+	"github.com/circa10a/shoutrrr"
 )
 
 // worker periodically processes expired switches and sends notifications.

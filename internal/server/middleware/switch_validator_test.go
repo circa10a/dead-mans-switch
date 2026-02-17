@@ -89,6 +89,16 @@ func TestSwitchValidator(t *testing.T) {
 			expectedStatus: http.StatusBadRequest,
 		},
 		{
+			name: "Failure - Negative ReminderThreshold",
+			payload: map[string]interface{}{
+				"message":           "test message",
+				"checkInInterval":   "24h",
+				"reminderThreshold": ptr("-1h"),
+				"notifiers":         []string{"discord://token"},
+			},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
 			name:           "Failure - Malformed JSON",
 			payload:        `{"message": "incomplete"...`,
 			expectedStatus: http.StatusBadRequest,

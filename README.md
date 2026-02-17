@@ -27,7 +27,7 @@ I have several personal use cases for this so I made this to run for myself. May
 
 ## Features
 
-- **Multi-channel alerting** — Notify via push, email, webhook, and more. Never miss an expired switch. Powered by [Shoutrrr](https://shoutrrr.nickfedor.com/latest)
+- **Multi-channel alerting** — Notify via push, email, webhook, and more. Never miss an expired switch. Powered by [Shoutrrr](https://caleblemoine.dev/shoutrrr/latest)
 - **Push notifications** — Check in via real-time push notifications on mobile or desktop before a switch expires as your chosen threshold.
 - **Zero-dependency deployment** — UI, CLI, and API ship as a single binary. No runtime dependencies, no sidecar services. Just run it.
 - **Secure** — Automatic TLS via [CertMagic](https://github.com/caddyserver/certmagic), with optional [Authentik](https://goauthentik.io/) OIDC integration for multi-user setups, optional encryption per switch.
@@ -38,9 +38,7 @@ I have several personal use cases for this so I made this to run for myself. May
 ### Demo
 
 <div align="center">
-  <a href="https://www.youtube.com/shorts/TZpzKno5kCI">
-    <img src="https://img.youtube.com/vi/TZpzKno5kCI/0.jpg" alt="Dead Man's Switch Mobile Demo" width="300"/>
-  </a>
+  <img src="docs/images/demo.gif" alt="Dead Man's Switch Mobile Demo" width="300"/>
   <p><em>Mobile App view — creating a switch, checking in, and receiving push notifications</em></p>
 </div>
 
@@ -210,6 +208,35 @@ Flags:
       --tls-key string                 Path to custom TLS key. Cannot be used with --auto-tls. (env: DEAD_MANS_SWITCH_TLS_KEY)
       --worker-batch-size int          How many notification records to process at a time. (env: DEAD_MANS_SWITCH_WORKER_BATCH_SIZE) (default 1000)
       --worker-interval duration       How often to check for expired switches. (env: DEAD_MANS_SWITCH_WORKER_INTERVAL) (default 5m0s)
+```
+
+### Switch Command
+
+```
+$ dead-mans-switch switch -h
+Manage dead man switches
+
+Usage:
+  dead-mans-switch switch [command]
+
+Available Commands:
+  create      Create a new dead man switch
+  delete      Delete a dead man switch
+  disable     Disable a dead man switch
+  get         Get all switches or a specific one by ID
+  reset       Reset a dead man switch timer
+  update      Update an existing dead man switch
+
+Flags:
+      --color           Enable colorized output (default true)
+  -h, --help            help for switch
+  -o, --output string   Output format (json, yaml) (default "json")
+  -u, --url string      API base URL (default "http://localhost:8080/api/v1")
+
+Global Flags:
+      --config string   Config file (default: ./dead-mans-switch.yaml or ~/dead-mans-switch.yaml)
+
+Use "dead-mans-switch switch [command] --help" for more information about a command.
 ```
 
 ## Deployment

@@ -67,7 +67,8 @@ func TestAuthGetConfigHandleFunc(t *testing.T) {
 			}
 
 			var resp api.AuthConfig
-			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+			err := json.NewDecoder(rec.Body).Decode(&resp)
+			if err != nil {
 				t.Fatalf("failed to decode response: %v", err)
 			}
 

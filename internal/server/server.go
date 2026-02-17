@@ -398,9 +398,15 @@ func (s *Server) validate() error {
 
 // getLogFormatter converts a log format string to usable log formatter
 func getLogFormatter(logformat string) log.Formatter {
-	switch logformat {
-	case "json":
-		return log.JSONFormatter
+	formatters := map[string]log.Formatter{
+		"json": log.JSONFormatter,
+		"text": log.TextFormatter,
 	}
+
+	if formatter, ok := formatters[logformat]; ok {
+		return formatter
+	}
+
+	// Default to text formatter if not specified or invalid
 	return log.TextFormatter
 }

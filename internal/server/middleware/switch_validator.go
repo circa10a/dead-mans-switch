@@ -74,6 +74,10 @@ func SwitchValidator(v *validator.Validate) func(http.Handler) http.Handler {
 					sendJSONError(w, http.StatusBadRequest, "Invalid ReminderThreshold format (e.g., 15m, 1h)")
 					return
 				}
+				if d < 0 {
+					sendJSONError(w, http.StatusBadRequest, "reminderThreshold must not be negative (e.g., 15m, 1h)")
+					return
+				}
 				reminderThresholdDuration = &d
 			}
 

@@ -482,7 +482,8 @@ func (s *sqliteStore) DecryptSwitch(sw *api.Switch) error {
 		if err != nil {
 			return fmt.Errorf("notifiers decryption failed: %w", err)
 		}
-		if err := json.Unmarshal(decryptedNotifiers, &sw.Notifiers); err != nil {
+		err = json.Unmarshal(decryptedNotifiers, &sw.Notifiers)
+		if err != nil {
 			return fmt.Errorf("notifiers unmarshal failed: %w", err)
 		}
 	}
@@ -492,7 +493,8 @@ func (s *sqliteStore) DecryptSwitch(sw *api.Switch) error {
 		if err != nil {
 			return fmt.Errorf("push decryption failed: %w", err)
 		}
-		if err := json.Unmarshal(decryptedPush, &sw.PushSubscription); err != nil {
+		err = json.Unmarshal(decryptedPush, &sw.PushSubscription)
+		if err != nil {
 			return fmt.Errorf("push unmarshal failed: %w", err)
 		}
 	}

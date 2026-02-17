@@ -25,7 +25,8 @@ func TestLoadOrCreateKey(t *testing.T) {
 			t.Errorf("expected %d bytes, got %d", defaultKeySize, len(key))
 		}
 
-		if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+		_, err = os.Stat(keyPath)
+		if os.IsNotExist(err) {
 			t.Error("expected key file to be created on disk")
 		}
 	})
@@ -94,10 +95,12 @@ func TestLoadOrCreateVAPIDKeys(t *testing.T) {
 		}
 
 		// Check if files exist
-		if _, err := os.Stat(privPath); os.IsNotExist(err) {
+		_, err = os.Stat(privPath)
+		if os.IsNotExist(err) {
 			t.Error("private key file was not created")
 		}
-		if _, err := os.Stat(pubPath); os.IsNotExist(err) {
+		_, err = os.Stat(pubPath)
+		if os.IsNotExist(err) {
 			t.Error("public key file was not created")
 		}
 	})

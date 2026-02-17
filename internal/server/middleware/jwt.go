@@ -193,7 +193,8 @@ func FetchPublicKeys(issuerURL string) (map[string]*rsa.PublicKey, error) {
 	}
 
 	var discovery oidcDiscovery
-	if err := json.NewDecoder(discoveryResp.Body).Decode(&discovery); err != nil {
+	err = json.NewDecoder(discoveryResp.Body).Decode(&discovery)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode OIDC discovery: %w", err)
 	}
 
@@ -222,7 +223,8 @@ func FetchPublicKeys(issuerURL string) (map[string]*rsa.PublicKey, error) {
 	}
 
 	var jwks jsonWebKeySet
-	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&jwks)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode JWKS: %w", err)
 	}
 

@@ -13,7 +13,8 @@ import (
 func TestNotifierValidator(t *testing.T) {
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		payload := api.Switch{}
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		err := json.NewDecoder(r.Body).Decode(&payload)
+		if err != nil {
 			t.Errorf("next handler failed to read body: %v", err)
 		}
 

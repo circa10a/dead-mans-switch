@@ -33,7 +33,8 @@ func TestHealthHandleFunc(t *testing.T) {
 		}
 
 		resp := api.Health{}
-		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		err := json.NewDecoder(rec.Body).Decode(&resp)
+		if err != nil {
 			t.Fatal(err)
 		}
 

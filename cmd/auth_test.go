@@ -81,7 +81,8 @@ func TestAuthLogin_Success(t *testing.T) {
 	}
 
 	var cached tokenCache
-	if unmarshalErr := json.Unmarshal(data, &cached); unmarshalErr != nil {
+	unmarshalErr := json.Unmarshal(data, &cached)
+	if unmarshalErr != nil {
 		t.Fatalf("failed to parse credentials: %v", unmarshalErr)
 	}
 	if cached.AccessToken != "test-access-token-123" {
@@ -191,7 +192,8 @@ func TestAuthLogin_ClientCredentials(t *testing.T) {
 	}
 
 	var cached tokenCache
-	if unmarshalErr := json.Unmarshal(data, &cached); unmarshalErr != nil {
+	unmarshalErr := json.Unmarshal(data, &cached)
+	if unmarshalErr != nil {
 		t.Fatalf("failed to parse credentials: %v", unmarshalErr)
 	}
 	if cached.AccessToken != "cc-access-token" {
@@ -255,7 +257,8 @@ func TestAuthLogout(t *testing.T) {
 	}
 
 	// Verify file was removed
-	if _, statErr := os.Stat(filepath.Join(credDir, "credentials.json")); !os.IsNotExist(statErr) {
+	_, statErr := os.Stat(filepath.Join(credDir, "credentials.json"))
+	if !os.IsNotExist(statErr) {
 		t.Error("expected credentials file to be removed")
 	}
 }

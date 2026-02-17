@@ -152,10 +152,10 @@ func ptrSwitchStatus(s api.SwitchStatus) *api.SwitchStatus {
 	return &s
 }
 
-// periodicHealthPing sends GET requests to https://<domain>/v1/health every 5 minutes
+// periodicHealthPing sends GET requests to https://<domain>every 5 minutes
 // for each configured domain to keep the demo instance alive.
 func periodicHealthPing(ctx context.Context, logger *slog.Logger, domains []string) {
-	log := logger.With("component", "demo-health-ping")
+	log := logger.With("component", "demo-ping")
 	ticker := time.NewTicker(demoHealthCheckInterval)
 	defer ticker.Stop()
 
@@ -175,7 +175,7 @@ func periodicHealthPing(ctx context.Context, logger *slog.Logger, domains []stri
 			return
 		case <-ticker.C:
 			for _, domain := range domains {
-				url := fmt.Sprintf("https://%s/v1/health", domain)
+				url := fmt.Sprintf("https://%s/", domain)
 
 				req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 				if err != nil {
@@ -188,7 +188,7 @@ func periodicHealthPing(ctx context.Context, logger *slog.Logger, domains []stri
 					log.Error("health ping failed", "domain", domain, "error", err)
 					continue
 				}
-				resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 
 				log.Debug("health ping completed", "domain", domain, "status", resp.StatusCode)
 			}

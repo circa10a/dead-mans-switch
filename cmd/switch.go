@@ -103,7 +103,8 @@ func dumpResponse(cmd *cobra.Command, statusCode int, body []byte, successData i
 
 	// Handle Errors: Try to parse structured API error first
 	var apiErr api.Error
-	if err := json.Unmarshal(body, &apiErr); err == nil && apiErr.Message != "" {
+	err := json.Unmarshal(body, &apiErr)
+	if err == nil && apiErr.Message != "" {
 		formatOutput(cmd, apiErr, true)
 		return
 	}
