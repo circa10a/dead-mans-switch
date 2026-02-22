@@ -244,18 +244,18 @@ Use "dead-mans-switch switch [command] --help" for more information about a comm
 
 ### Docker Compose
 
-Run the service with integrated monitoring and observability stack:
+```yaml
+services:
+  dead-mans-switch:
+    image: circa10a/dead-mans-switch
+    ports:
+      - 8080:8080
+    volumes:
+      - dms_data:/data
 
-```bash
-make docker-compose
+volumes:
+  dms_data:
 ```
-
-This starts:
-- **API Server**: http://localhost:8080
-- **Grafana** (dashboards): http://localhost:3000
-- **Prometheus** (metrics): http://localhost:9090
-- **Loki** (logs)
-- **Promtail** (log shipper)
 
 ### Kubernetes
 
