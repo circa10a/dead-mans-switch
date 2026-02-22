@@ -22,6 +22,12 @@ jobs:
         WITH_V: true
         RELEASE_BRANCHES: main
         DEFAULT_BUMP: patch
+    - name: Fetch new tag
+      run: git fetch --tags --force
+    - name: Install Go
+      uses: actions/setup-go@v6
+      with:
+        go-version-file: go.mod
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx

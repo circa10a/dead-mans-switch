@@ -221,6 +221,7 @@ func New(cfg *Config) (*Server, error) {
 
 	// Default middlewares
 	server.mux = middleware.Logging(server.logger, server.mux)
+	server.mux = middleware.SecurityHeaders(server.mux)
 
 	// Add middlewares via http.Handler chaining
 	for _, mw := range server.middlewares {

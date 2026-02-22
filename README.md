@@ -27,8 +27,9 @@ I have several personal use cases for this so I made this to run for myself. May
 
 ## Features
 
-- **Multi-channel alerting** — Notify via push, email, webhook, and more. Never miss an expired switch. Powered by [Shoutrrr](https://caleblemoine.dev/shoutrrr/latest)
+- **Multi-channel alerting** — Notify via push, email, webhook, twilio, discord and more. Never miss an expired switch. Powered by [Shoutrrr](https://caleblemoine.dev/shoutrrr/latest)
 - **Push notifications** — Check in via real-time push notifications on mobile or desktop before a switch expires as your chosen threshold.
+- **Add location to switches** — Add a google maps link to your switch's message with a single click.
 - **Zero-dependency deployment** — UI, CLI, and API ship as a single binary. No runtime dependencies, no sidecar services. Just run it.
 - **Secure** — Automatic TLS via [CertMagic](https://github.com/caddyserver/certmagic), with optional [Authentik](https://goauthentik.io/) OIDC integration for multi-user setups, optional encryption per switch.
 - **Full observability** — Prometheus metrics and structured JSON logging
