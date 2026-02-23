@@ -3,7 +3,7 @@
 **Dead Man's Switch** is an all one self-hosted app for creating a "Dead Man's Switch". Create switch via the UI, API, or CLI that sends a message via many providers if you don't "check-in" by resetting your timer(s).
 
 ![Build Status](https://github.com/circa10a/dead-mans-switch/workflows/deploy/badge.svg)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/circa10a/dead-mans-switch)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/circa10a/dead-mans-switch.svg)
 
 <img width="35%" height="35%" src="docs/images/grim_gopher.png" align="right"/>
 
