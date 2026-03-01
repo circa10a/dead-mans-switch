@@ -74,6 +74,6 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@v2.22.11
+        uses: securego/gosec@v2.24.7
         with:
           args: ./...
