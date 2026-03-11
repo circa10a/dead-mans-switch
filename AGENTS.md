@@ -27,7 +27,7 @@ Do not introduce alternatives to these without discussion:
 | `spf13/cobra` + `spf13/viper` | CLI + config (env vars use `DEAD_MANS_SWITCH_` prefix) |
 | `charmbracelet/log` | slog handler (text/JSON output) |
 | `modernc.org/sqlite` | Pure-Go SQLite (no CGO) |
-| `circa10a/shoutrrr` | Multi-provider notifications |
+| `nicholas-fedor/shoutrrr` | Multi-provider notifications |
 | `go-playground/validator` | Request body validation |
 
 ## Generated Code
