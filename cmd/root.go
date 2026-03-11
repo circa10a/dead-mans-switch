@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -15,7 +16,8 @@ var (
 	project      = "dead-mans-switch"
 	envVarPrefix = "DEAD_MANS_SWITCH"
 
-	// Set at build time with -ldflags
+	// Set at build time with -ldflags; overridden by debug.BuildInfo when
+	// installed via "go install".
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
@@ -26,6 +28,29 @@ var (
 		Version: version,
 	}
 )
+
+func init() {
+	// When built with "go install", ldflags are not set. Fall back to the
+	// module version and VCS info embedded by the Go toolchain.
+	if version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			if info.Main.Version != "" && info.Main.Version != "(devel)" {
+				version = info.Main.Version
+			}
+			for _, kv := range info.Settings {
+				switch kv.Key {
+				case "vcs.revision":
+					if len(kv.Value) >= 7 {
+						commit = kv.Value[:7]
+					}
+				case "vcs.time":
+					date = kv.Value
+				}
+			}
+			rootCmd.Version = version
+		}
+	}
+}
 
 var versionCmd = &cobra.Command{
 	Use:   "version",
