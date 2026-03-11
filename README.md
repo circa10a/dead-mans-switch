@@ -27,7 +27,7 @@ I have several personal use cases for this so I made this to run for myself. May
 
 ## Features
 
-- **Multi-channel alerting** — Notify via push, email, webhook, twilio, discord and more. Never miss an expired switch. Powered by [Shoutrrr](https://caleblemoine.dev/shoutrrr/latest)
+- **Multi-channel alerting** — Notify via push, email, webhook, twilio, discord and more. Never miss an expired switch. Powered by [Shoutrrr](https://shoutrrr.nickfedor.com/latest)
 - **Push notifications** — Check in via real-time push notifications on mobile or desktop before a switch expires as your chosen threshold.
 - **Add location to switches** — Add a google maps link to your switch's message with a single click.
 - **Zero-dependency deployment** — UI, CLI, and API ship as a single binary. No runtime dependencies, no sidecar services. Just run it.
