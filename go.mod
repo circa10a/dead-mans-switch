@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
-	github.com/caddyserver/certmagic v0.25.3
+	github.com/caddyserver/certmagic v0.25.4
 	github.com/charmbracelet/log v1.0.0
 	github.com/fatih/color v1.19.0
 	github.com/go-chi/chi/v5 v5.2.5
