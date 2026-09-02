@@ -14,6 +14,7 @@ import (
 	"github.com/circa10a/dead-mans-switch/api"
 	"github.com/circa10a/dead-mans-switch/internal/server/database"
 	"github.com/nicholas-fedor/shoutrrr"
+	"github.com/nicholas-fedor/shoutrrr/pkg/types"
 )
 
 // worker periodically processes expired switches and sends notifications.
@@ -206,7 +207,7 @@ func (w *worker) sendNotifiers(sw api.Switch) error {
 	var errs []error
 
 	for _, url := range sw.Notifiers {
-		sender, err := shoutrrr.CreateSender(url)
+		sender, err := shoutrrr.CreateSenderWithOptions(types.SenderOptions{}, url)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to create sender for %s: %w", url, err))
 			continue

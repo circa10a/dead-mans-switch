@@ -74,6 +74,8 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run Gosec Security Scanner
+        env:
+          GOTOOLCHAIN: auto
         uses: securego/gosec@v2.29.0
         with:
           args: ./...

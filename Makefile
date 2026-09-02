@@ -20,12 +20,14 @@ EXTERNAL_YAML := api/openapi.external.gen.yaml
 INTERNAL_HTML := internal/server/docs/api.internal.html
 EXTERNAL_HTML := internal/server/docs/api.public.html
 
-WEB_DIR       := internal/server/web
-STATIC_DIR    := $(WEB_DIR)/static
-CSS_OUT       := $(STATIC_DIR)/css/tailwind.css
-JS_OUT        := $(STATIC_DIR)/js/alpine.min.js
-INPUT_CSS     := $(WEB_DIR)/input.css
-HTML_FILES    := $(shell find $(WEB_DIR) -name "*.html")
+WEB_DIR          := internal/server/web
+STATIC_DIR       := $(WEB_DIR)/static
+CSS_OUT          := $(STATIC_DIR)/css/tailwind.css
+JS_OUT           := $(STATIC_DIR)/js/alpine.min.js
+INPUT_CSS        := $(WEB_DIR)/input.css
+HTML_FILES       := $(shell find $(WEB_DIR) -name "*.html")
+TAILWIND_VERSION := 4.1.11
+TAILWIND_CLI_VERSION := 4.1.11
 
 .PHONY: all build assets docs sdk clean
 all: build
@@ -56,9 +58,9 @@ $(CSS_OUT): $(INPUT_CSS) $(HTML_FILES)
 	@mkdir -p $(STATIC_DIR)/css
 	@docker run --rm -v $$PWD:/src -w /src node:slim \
 		sh -c "npm init -y > /dev/null && \
-		npm install --no-save tailwindcss@4 @tailwindcss/cli@4 && \
+		npm install --no-save --package-lock=false tailwindcss@$(TAILWIND_VERSION) @tailwindcss/cli@$(TAILWIND_CLI_VERSION) && \
 		npx tailwindcss -i $(INPUT_CSS) -o $(CSS_OUT) --minify"
-	@rm package.json
+	@rm -f package.json package-lock.json
 	@rm -rf node_modules
 
 # AlpineJS Bundle

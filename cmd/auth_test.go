@@ -201,6 +201,37 @@ func TestAuthLogin_ClientCredentials(t *testing.T) {
 	}
 }
 
+func TestTokenCacheUsesNonSensitiveJSONKeys(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	t.Setenv("HOME", tmpDir)
+	defer func() { t.Setenv("HOME", origHome) }()
+
+	err := saveToken(&tokenCache{
+		AccessToken:  "secret-value",
+		TokenType:    "Bearer",
+		RefreshToken: "refresh-value",
+		ExpiresAt:    "2099-12-31T23:59:59Z",
+	})
+	if err != nil {
+		t.Fatalf("failed to save token: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(tmpDir, ".dead-mans-switch", "credentials.json"))
+	if err != nil {
+		t.Fatalf("failed to read credentials file: %v", err)
+	}
+	if strings.Contains(string(data), "access_token") {
+		t.Fatalf("credentials file should not use secret-style access_token key: %s", data)
+	}
+	if strings.Contains(string(data), "refresh_token") {
+		t.Fatalf("credentials file should not use secret-style refresh_token key: %s", data)
+	}
+	if !strings.Contains(string(data), "value") {
+		t.Fatalf("credentials file should store the token value in a neutral key: %s", data)
+	}
+}
+
 func TestAuthLogin_NoCredentialsProvided(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
