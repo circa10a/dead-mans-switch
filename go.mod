@@ -1,6 +1,6 @@
 module github.com/circa10a/dead-mans-switch
 
-go 1.26.0
+go 1.27.0
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
