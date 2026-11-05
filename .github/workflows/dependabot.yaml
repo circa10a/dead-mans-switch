@@ -2,32 +2,49 @@
 name: Dependabot auto-approve
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_run:
+    workflows: [test, Build]
+    types: [completed]
 
 permissions:
+  actions: read
   contents: write
   pull-requests: write
 
 jobs:
   dependabot:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.workflow_run.conclusion == 'success'
     steps:
-      - name: Dependabot metadata
-        id: metadata
-        uses: dependabot/fetch-metadata@v3
-        with:
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Verify PR checks and find Dependabot PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          ALL_CHECKS_PASSED=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${HEAD_SHA}&per_page=100" \
+            --jq '[.workflow_runs[] | select(.event == "pull_request" and .head_sha == env.HEAD_SHA and (.name == "test" or .name == "Build"))] | sort_by(.name) | group_by(.name) | map(max_by(.run_attempt)) | length == 2 and all(.[]; .status == "completed" and .conclusion == "success")')
+          if [[ "$ALL_CHECKS_PASSED" != "true" ]]; then
+            echo "Not all PR workflows have succeeded; skipping approval."
+            exit 0
+          fi
+
+          PR_NUMBER=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/pulls" \
+            --jq '.[] | select(.user.login == "dependabot[bot]" and .state == "open" and .head.sha == env.HEAD_SHA) | .number')
+          if [[ -n "$PR_NUMBER" ]]; then
+            echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Approve Dependabot PR
-        run: gh pr review --approve "$PR_URL"
+        if: steps.pr.outputs.number != ''
+        run: gh pr review "$PR_NUMBER" --approve
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge Dependabot PR
-        run: gh pr merge --auto --merge "$PR_URL"
+        if: steps.pr.outputs.number != ''
+        run: gh pr merge "$PR_NUMBER" --auto --merge
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -41,7 +41,7 @@ func TestNotifierValidator(t *testing.T) {
 			name:   "valid multiple urls",
 			method: http.MethodPost,
 			payload: api.Switch{
-				Notifiers: []string{"logger://", "discord://token@id"},
+				Notifiers: []string{"logger://", "discord://token@123456789"},
 			},
 			expectedStatus: http.StatusOK,
 		},
