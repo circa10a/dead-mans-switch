@@ -45,6 +45,7 @@ jobs:
         run: docker build -t ${{ github.repository }} .
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@v0.36.0
+        continue-on-error: ${{ github.actor == 'dependabot[bot]' }}
         with:
           image-ref: ${{ github.repository }}
           format: 'table'

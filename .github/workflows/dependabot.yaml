@@ -27,12 +27,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge Dependabot PR
-        run: |
-          if gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null' >/dev/null 2>&1; then
-            gh pr merge --auto --merge "$PR_URL"
-          else
-            gh pr merge --merge "$PR_URL"
-          fi
+        run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
