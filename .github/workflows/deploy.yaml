@@ -8,7 +8,8 @@ on:
 
 jobs:
   release:
-    permissions: write-all
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7
